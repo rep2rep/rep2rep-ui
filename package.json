@@ -1,0 +1,23 @@
+{
+  "name": "rep2rep-ui",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "A tool to allow representation analysts to build rep2rep constructions",
+  "private": true,
+  "scripts": {
+    "test": "echo 'No tests!'",
+    "build": "rm -rf dist && ./node_modules/rescript/rescript build -with-deps && mkdir -p dist && node ./bundle.js && cp ./src/index.html ./dist/index.html",
+    "clean": "./node_modules/rescript/rescript clean; rm -rf ./dist",
+    "format": "./scripts/format-rescript; ./scripts/format-json",
+    "watch": "./scripts/watch"
+  },
+  "author": "rep2rep",
+  "devDependencies": {
+    "esbuild": "^0.13.8",
+    "rescript": "^9.1.4"
+  },
+  "dependencies": {
+    "@rescript/react": "^0.10.3",
+    "rescript-react-d3-graph": "file:../rescript-react-d3-graph"
+  }
+}

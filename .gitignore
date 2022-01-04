@@ -1,0 +1,8 @@
+.DS_Store
+/node_modules/
+/lib/
+/dist/
+package-lock.json
+.bsb.lock
+.merlin
+*.bs.js
