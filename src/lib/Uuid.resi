@@ -1,5 +1,6 @@
 type t
 
+let t_rpc: Rpc.Datatype.t<t>
 
 let create: unit => t
 

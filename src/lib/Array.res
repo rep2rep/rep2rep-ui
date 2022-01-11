@@ -1,5 +1,6 @@
 include Belt.Array
 
+let t_rpc = Rpc.Datatype.array_
 
 let toJson = (t, jsonify) => t->map(jsonify)->Js.Json.array
 let fromJson = (j, decode) =>

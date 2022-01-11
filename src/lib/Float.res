@@ -1,5 +1,6 @@
 include Belt.Float
 
+let t_rpc = Rpc.Datatype.float_
 
 let toJson = Js.Json.number
 let fromJson = j =>

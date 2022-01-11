@@ -1,5 +1,6 @@
 type t = bool
 
+let t_rpc = Rpc.Datatype.bool_
 
 let not = t => !t
 

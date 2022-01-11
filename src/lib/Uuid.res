@@ -1,5 +1,6 @@
 type t = int
 
+let t_rpc = Rpc.Datatype.int_
 
 let base = 16
 

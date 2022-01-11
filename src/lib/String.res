@@ -1,5 +1,6 @@
 include Js.String2
 
+let t_rpc = Rpc.Datatype.string_
 
 let toJson = Js.Json.string
 let fromJson = j =>
