@@ -514,6 +514,8 @@ type t = {
   port: int,
 }
 
+type response<'a> = Promise.t<option<'a>>
+
 let create = (host, port) => {host: host, port: port}
 
 let require = (service, endpoint, param_type, return_type) => {

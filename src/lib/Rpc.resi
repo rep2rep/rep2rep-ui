@@ -80,6 +80,7 @@ module Datatype: {
 }
 
 type t
+type response<'a> = Promise.t<option<'a>>
 
 let create: (string, int) => t
-let require: (t, string, Datatype.t<'a>, Datatype.t<'b>, 'a) => Promise.t<option<'b>>
+let require: (t, string, Datatype.t<'a>, Datatype.t<'b>, 'a) => response<'b>
