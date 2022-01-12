@@ -79,8 +79,15 @@ module Datatype: {
   let eitherN_: t<(int, data)>
 }
 
+module Response: {
+  type t<'a> = Promise.t<option<'a>>
+
+  let upon: (t<'a>, 'a => unit) => unit
+  let map: (t<'a>, 'a => 'b) => t<'b>
+  let flatMap: (t<'a>, 'a => t<'b>) => t<'b>
+}
+
 type t
-type response<'a> = Promise.t<option<'a>>
 
 let create: (string, int) => t
-let require: (t, string, Datatype.t<'a>, Datatype.t<'b>, 'a) => response<'b>
+let require: (t, string, Datatype.t<'a>, Datatype.t<'b>, 'a) => Response.t<'b>

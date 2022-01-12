@@ -509,12 +509,34 @@ module Datatype = {
   }
 }
 
+module Response = {
+  type t<'a> = Promise.t<option<'a>>
+
+  let upon = (t, f) =>
+    t
+    ->Promise.thenResolve(t =>
+      switch t {
+      | Some(t) => f(t)
+      | None => ()
+      }
+    )
+    ->ignore
+
+  let map = (t, f) => t->Promise.thenResolve(t => t->Belt.Option.map(f))
+
+  let flatMap = (t, f) =>
+    t->Promise.then(t =>
+      switch t {
+      | Some(t) => f(t)
+      | None => Promise.resolve(None)
+      }
+    )
+}
+
 type t = {
   host: string,
   port: int,
 }
-
-type response<'a> = Promise.t<option<'a>>
 
 let create = (host, port) => {host: host, port: port}
 
