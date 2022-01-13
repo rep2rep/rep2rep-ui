@@ -58,3 +58,17 @@ let vertex_rpc = Rpc.Datatype.either2_(
 )
 
 let walk_rpc = Array.t_rpc(vertex_rpc)->Rpc.Datatype.alias("Constructions.walk")
+
+let url = s => "core.construction." ++ s
+
+let size = Rpc_service.require(url("size"), construction_rpc, Int.t_rpc)
+let leavesOfConstruction = Rpc_service.require(
+  url("leavesOfConstruction"),
+  construction_rpc,
+  Array.t_rpc(CSpace.token_rpc),
+)
+let fullTokenSequence = Rpc_service.require(
+  url("fullTokenSequence"),
+  construction_rpc,
+  Array.t_rpc(CSpace.token_rpc),
+)
