@@ -17,6 +17,7 @@
     "react-jsx": 3
   },
   "bs-dependencies": [
+    "bs-fetch",
     "@ryyppy/rescript-promise",
     "@rescript/react",
     "rescript-react-d3-graph"

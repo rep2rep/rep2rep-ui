@@ -540,18 +540,23 @@ type t = {
 
 let create = (host, port) => {host: host, port: port}
 
+external toBuffer: data => Fetch.bufferSource = "%identity"
+external ofBuffer: Fetch.arrayBuffer => data = "%identity"
+
 let require = (service, endpoint, param_type, return_type) => {
   param => {
     let param_bytes = Datatype.write(param_type, param)
-    Fetch.fetch(
+    Fetch.fetchWithInit(
       service.host ++ ":" ++ Belt.Int.toString(service.port) ++ "/" ++ endpoint,
-      ~method=POST,
-      ~body=param_bytes,
-      (),
+      Fetch.RequestInit.make(
+        ~method_=Post,
+        ~body=Fetch.BodyInit.makeWithBufferSource(param_bytes->toBuffer),
+        (),
+      ),
     )->Promise.then(response =>
-      if response.ok {
+      if Fetch.Response.ok(response) {
         Fetch.Response.arrayBuffer(response)->Promise.thenResolve(buff => {
-          Some(Datatype.read(return_type, buff))
+          Some(Datatype.read(return_type, buff->ofBuffer))
         })
       } else {
         Promise.resolve(None)
