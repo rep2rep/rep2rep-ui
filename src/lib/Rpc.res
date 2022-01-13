@@ -92,8 +92,13 @@ module Datatype = {
 
   let int_ = {
     // JS "ints" are floats, so this might be pretty dangerous!
+    let rec iter = (f, i, x) =>
+      switch i {
+      | 0 => x
+      | i => iter(f, i - 1, f(x))
+      }
     let packInt = i => {
-      let shift = (i, s) => mod(i / Js.Math.pow_int(~base=2, ~exp=s), 256)
+      let shift = (i, s) => mod(iter(x => x / 2, s, i), 256)
       let b1 = shift(i, 0)
       let b2 = shift(i, 8)
       let b3 = shift(i, 16)
@@ -105,7 +110,7 @@ module Datatype = {
       ofArray([b8, b7, b6, b5, b4, b3, b2, b1])
     }
     let unpackInt = b => {
-      let unshift = (i, s) => i * Js.Math.pow_int(~base=2, ~exp=s)
+      let unshift = (i, s) => iter(x => x * 2, s, i)
       let get = Js.TypedArray2.Uint8Array.unsafe_get
       let b1 = get(b, 7)
       let b2 = get(b, 6)
