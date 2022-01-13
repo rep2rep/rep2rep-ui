@@ -546,19 +546,21 @@ type t = {
 let create = (host, port) => {host: host, port: port}
 
 external toBuffer: data => Fetch.bufferSource = "%identity"
-external ofBuffer: Fetch.arrayBuffer => data = "%identity"
+external ofBuffer_ext: Fetch.arrayBuffer => Js.TypedArray2.ArrayBuffer.t = "%identity"
+let ofBuffer = b => ofBuffer_ext(b)->Js.TypedArray2.Uint8Array.fromBuffer
 
 let require = (service, endpoint, param_type, return_type) => {
   param => {
     let param_bytes = Datatype.write(param_type, param)
     Fetch.fetchWithInit(
-      service.host ++ ":" ++ Belt.Int.toString(service.port) ++ "/" ++ endpoint,
+      "http://" ++ service.host ++ ":" ++ Belt.Int.toString(service.port) ++ "/" ++ endpoint,
       Fetch.RequestInit.make(
         ~method_=Post,
         ~body=Fetch.BodyInit.makeWithBufferSource(param_bytes->toBuffer),
         (),
       ),
-    )->Promise.then(response =>
+    )
+    ->Promise.then(response =>
       if Fetch.Response.ok(response) {
         Fetch.Response.arrayBuffer(response)->Promise.thenResolve(buff => {
           Some(Datatype.read(return_type, buff->ofBuffer))
@@ -567,5 +569,9 @@ let require = (service, endpoint, param_type, return_type) => {
         Promise.resolve(None)
       }
     )
+    ->Promise.catch(ex => {
+      Js.Console.log(ex)
+      Promise.resolve(None)
+    })
   }
 }
