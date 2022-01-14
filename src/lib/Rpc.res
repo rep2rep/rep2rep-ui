@@ -556,6 +556,9 @@ let require = (service, endpoint, param_type, return_type) => {
       "http://" ++ service.host ++ ":" ++ Belt.Int.toString(service.port) ++ "/" ++ endpoint,
       Fetch.RequestInit.make(
         ~method_=Post,
+        ~headers=Fetch.HeadersInit.make({
+          "Content-Type": "application/octet-stream",
+        }),
         ~body=Fetch.BodyInit.makeWithBufferSource(param_bytes->toBuffer),
         (),
       ),
