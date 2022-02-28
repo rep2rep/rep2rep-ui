@@ -63,10 +63,19 @@ module Map = {
   let has = Belt.Map.has
   let set = Belt.Map.set
   let get = Belt.Map.get
+  let update = Belt.Map.update
+  let remove = Belt.Map.remove
+  let map = Belt.Map.map
+  let mapWithKey = Belt.Map.mapWithKey
+  let forEach = Belt.Map.forEach
   let merge = Belt.Map.merge
+  let keys = Belt.Map.keysToArray
+  let values = Belt.Map.valuesToArray
 
   let toList = Belt.Map.toList
   let fromList = lst => lst->List.reduce(empty(), (t, (k, v)) => set(t, k, v))
+  let toArray = Belt.Map.toArray
+  let fromArray = Belt.Map.fromArray(~id=module(Cmp))
 
   let toJson = (t, encode) =>
     toList(t)->List.map(((k, v)) => (toString(k), encode(v)))->Js.Dict.fromList->Js.Json.object_
