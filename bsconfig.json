@@ -20,6 +20,7 @@
     "bs-fetch",
     "@ryyppy/rescript-promise",
     "@rescript/react",
-    "rescript-react-d3-graph"
+    "rescript-react-d3-graph",
+    "rescript-react-draggable-list"
   ]
 }
