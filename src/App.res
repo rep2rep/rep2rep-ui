@@ -13,13 +13,42 @@ module App = {
   }
 
   let config = ReactD3Graph.Config.create(
-    ~global=ReactD3Graph.Config.Global.create(~width="100%", ~height="calc(100vh - 40px)", ()),
+    ~global=ReactD3Graph.Config.Global.create(
+      ~width="100%",
+      ~height="calc(100vh - 40px)",
+      ~defs=[
+        <marker id="arrowhead" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+          <path d="M1 1 L7 4 L1 7" fill="none" strokeWidth="1" stroke="#000000" />
+        </marker>,
+      ],
+      (),
+    ),
     ~d3=ReactD3Graph.Config.D3.create(~disableLinkForce=true, ()),
+    ~node=ReactD3Graph.Node.Config.create(
+      ~fontSize=12.0,
+      ~fontScaling=false,
+      ~labelProperty=node =>
+        node
+        ->ReactD3Graph.Node.payload
+        ->Option.map(p =>
+          switch p {
+          | GraphState.GraphNode.Constructor(s) => s
+          | GraphState.GraphNode.Token(_) => ""
+          }
+        )
+        ->Option.getWithDefault(""),
+      (),
+    ),
     ~link=ReactD3Graph.Link.Config.create(
       ~color=ReactD3Graph.Color.ofHexString("#000000"),
       ~renderLabel=true,
+      ~labelProperty=link =>
+        link->ReactD3Graph.Link.payload->Option.map(Int.toString)->Option.getWithDefault(""),
+      ~fontSize=10.0,
+      ~fontScaling=false,
       ~curveType=ReactD3Graph.Link.CurveType.catmullRom,
       ~strokeWidth=1.,
+      ~markerEnd="arrowhead",
       (),
     ),
     (),
@@ -48,8 +77,8 @@ module App = {
       focused
       ->Option.flatMap(state->State.construction(_))
       ->Option.map(State.Construction.graph)
-      ->Option.map(State.GraphState.selection)
-      ->Option.getWithDefault(State.GraphState.Selection.empty)
+      ->Option.map(GraphState.selection)
+      ->Option.getWithDefault(GraphState.Selection.empty)
 
     let dispatchC = e =>
       focused->Option.iter(focused => dispatch(Event.ConstructionEvent(focused, e)))
@@ -75,16 +104,28 @@ module App = {
       dispatchC(Event.Construction.AddConstructor(Uuid.create(), x, y))
     let duplicateNodes = _ => Js.Console.log("Duplicate Nodes!")
     let connectNodes = _ =>
-      switch State.GraphState.Selection.nodes(selection) {
+      switch GraphState.Selection.nodes(selection) {
+      | [self] => dispatchC(Event.Construction.ConnectNodes(Uuid.create(), self, self))
       | [source, target] =>
         dispatchC(Event.Construction.ConnectNodes(Uuid.create(), source, target))
       | _ => ()
       }
-    let disconnectNodes = _ => Js.Console.log("Unlink Nodes!")
-    let deleteNodes = _ =>
+    let deleteSelection = _ => {
       selection
-      ->State.GraphState.Selection.nodes
-      ->Array.forEach(nodeId => dispatchC(Event.Construction.DeleteNode(nodeId)))
+      ->GraphState.Selection.nodes
+      ->Array.forEach(nodeId => {
+        focused
+        ->Option.flatMap(State.construction(state, _))
+        ->Option.map(State.Construction.graph)
+        ->Option.map(GraphState.incidentLinks(_, ~nodeId))
+        ->Option.map(o => Array.concat(o["in"], o["out"]))
+        ->Option.iter(Array.forEach(_, linkId => dispatchC(Event.Construction.DeleteLink(linkId))))
+        dispatchC(Event.Construction.DeleteNode(nodeId))
+      })
+      selection
+      ->GraphState.Selection.links
+      ->Array.forEach(linkId => dispatchC(Event.Construction.DeleteLink(linkId)))
+    }
     let movedNode = (id, ~x, ~y) =>
       dispatchC(
         Event.Construction.MoveNode(id->ReactD3Graph.Node.Id.toString->Uuid.fromString, x, y),
@@ -92,9 +133,7 @@ module App = {
 
     let selectionChange = (~oldSelection as _, ~newSelection) =>
       dispatchC(
-        Event.Construction.ChangeSelection(
-          State.GraphState.Selection.fromReactD3Selection(newSelection),
-        ),
+        Event.Construction.ChangeSelection(GraphState.Selection.fromReactD3Selection(newSelection)),
       )
 
     module K = GlobalKeybindings.KeyBinding
@@ -108,9 +147,9 @@ module App = {
       ("t", addTokenNodeAt),
       ("c", addConstructorNodeAt),
       ("e", (e, ~x as _, ~y as _) => connectNodes(e)),
-      ("x", (e, ~x as _, ~y as _) => deleteNodes(e)),
-      ("Backspace", (e, ~x as _, ~y as _) => deleteNodes(e)),
-      ("Delete", (e, ~x as _, ~y as _) => deleteNodes(e)),
+      ("x", (e, ~x as _, ~y as _) => deleteSelection(e)),
+      ("Backspace", (e, ~x as _, ~y as _) => deleteSelection(e)),
+      ("Delete", (e, ~x as _, ~y as _) => deleteSelection(e)),
       ("Ctrl+d", (e, ~x as _, ~y as _) => duplicateNodes(e)),
     ])
 
@@ -169,9 +208,7 @@ module App = {
           <Button.Separator />
           <Button onClick={connectNodes} value="Connect" enabled={toolbarActive} />
           <Button.Separator />
-          <Button onClick={disconnectNodes} value="Disconnect" enabled={toolbarActive} />
-          <Button.Separator />
-          <Button onClick={deleteNodes} value="Delete" enabled={toolbarActive} />
+          <Button onClick={deleteSelection} value="Delete" enabled={toolbarActive} />
           // <Button.Separator />
           // <a href="manual.html" target="_blank"> {React.string("Manual")} </a>
         </div>
@@ -190,13 +227,11 @@ module App = {
             ->Option.flatMap(focused =>
               state
               ->State.construction(focused)
-              ->Option.map(construction =>
-                construction->State.Construction.graph->State.GraphState.data
-              )
+              ->Option.map(construction => construction->State.Construction.graph->GraphState.data)
             )
-            ->Option.getWithDefault(State.GraphState.empty->State.GraphState.data)}
+            ->Option.getWithDefault(GraphState.empty->GraphState.data)}
             config
-            selection={selection->State.GraphState.Selection.toReactD3Selection}
+            selection={selection->GraphState.Selection.toReactD3Selection}
             onSelectionChange={selectionChange}
             onNodePositionChange={movedNode}
             keybindings={keybindings}

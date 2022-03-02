@@ -8,7 +8,7 @@ module Construction = {
     | MoveNode(Uuid.t, float, float)
     | DeleteNode(Uuid.t)
     | DeleteLink(Uuid.t)
-    | ChangeSelection(State.GraphState.Selection.t)
+    | ChangeSelection(GraphState.Selection.t)
 
   let dispatch = (construction, t) =>
     switch t {
