@@ -24,21 +24,7 @@ module App = {
       (),
     ),
     ~d3=ReactD3Graph.Config.D3.create(~disableLinkForce=true, ()),
-    ~node=ReactD3Graph.Node.Config.create(
-      ~fontSize=12.0,
-      ~fontScaling=false,
-      ~labelProperty=node =>
-        node
-        ->ReactD3Graph.Node.payload
-        ->Option.map(p =>
-          switch p {
-          | GraphState.GraphNode.Constructor(s) => s
-          | GraphState.GraphNode.Token(_) => ""
-          }
-        )
-        ->Option.getWithDefault(""),
-      (),
-    ),
+    ~node=ReactD3Graph.Node.Config.create(~renderLabel=false, ()),
     ~link=ReactD3Graph.Link.Config.create(
       ~color=ReactD3Graph.Color.ofHexString("#000000"),
       ~renderLabel=true,

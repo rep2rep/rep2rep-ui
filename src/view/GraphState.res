@@ -6,14 +6,64 @@ module GraphNode = {
     | Token(TokenData.t)
     | Constructor(ConstructorData.t)
 
-  type t = ReactD3Graph.Node.t<nodeData>
+  type t = ReactD3Graph.Node.t<unit>
 
-  let tokenConfig = _ => ReactD3Graph.Node.Config.create()
+  let unselectedFill = "white"
+  let selectedFill = "rgb(220, 220, 220)"
+  let unselectedStrokeWidth = "1"
+  let selectedStrokeWidth = "2"
+
+  let tokenConfig = data => {
+    let size = TokenData.size(data)
+    ReactD3Graph.Node.Config.create(
+      ~size={"width": size["width"] *. 10. +. 20., "height": size["height"] *. 10. +. 20.},
+      ~viewGenerator=node => {
+        <>
+          <rect
+            x={"1"}
+            y={"1"}
+            width={size["width"]->Float.toString}
+            height={size["height"]->Float.toString}
+            rx="7"
+            ry="7"
+            fill={if ReactD3Graph.Node.selected(node) {
+              selectedFill
+            } else {
+              unselectedFill
+            }}
+            stroke="black"
+            strokeWidth={if ReactD3Graph.Node.selected(node) {
+              selectedStrokeWidth
+            } else {
+              unselectedStrokeWidth
+            }}
+          />
+          <g x={"1"} y={"1"}> {TokenData.render(data)} </g>
+        </>
+      },
+      (),
+    )
+  }
   let constructorConfig = _ =>
     ReactD3Graph.Node.Config.create(
-      ~size={"width": 220., "height": 220.},
+      ~size={"width": 120., "height": 120.},
       ~viewGenerator=node => {
-        <svg> <circle cx="6" cy="6" r="5" fill="white" stroke="black" /> </svg>
+        <circle
+          cx="6"
+          cy="6"
+          r="5"
+          fill={if ReactD3Graph.Node.selected(node) {
+            selectedFill
+          } else {
+            unselectedFill
+          }}
+          stroke="black"
+          strokeWidth={if ReactD3Graph.Node.selected(node) {
+            selectedStrokeWidth
+          } else {
+            unselectedStrokeWidth
+          }}
+        />
       },
       (),
     )
@@ -23,7 +73,7 @@ module GraphNode = {
     | Token(data) => tokenConfig(data)
     | Constructor(data) => constructorConfig(data)
     }
-    ReactD3Graph.Node.create(~id=fromUuid(id), ~payload, ~x, ~y, ~config, ())
+    ReactD3Graph.Node.create(~id=fromUuid(id), ~payload=(), ~x, ~y, ~config, ())
   }
 
   let data = t => [t]
