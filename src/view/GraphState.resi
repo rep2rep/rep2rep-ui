@@ -6,7 +6,7 @@ module GraphNode: {
   type t
 
   let create: (Gid.t, ~x: float, ~y: float, nodeData) => t
-  let data: t => array<ReactD3Graph.Node.t<unit>>
+  let data: t => array<ReactD3Graph.Node.t<[#token | #constructor]>>
   let move: (t, ~x: float, ~y: float) => t
 }
 
@@ -31,7 +31,7 @@ type t
 
 let duplicate: (t, Gid.Map.t<Gid.t>) => t
 let empty: t
-let data: t => ReactD3Graph.Data.t<unit, int>
+let data: t => ReactD3Graph.Data.t<[#token | #constructor], int>
 let selection: t => Selection.t
 
 let addNode: (t, GraphNode.t) => t

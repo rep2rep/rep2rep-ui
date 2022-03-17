@@ -6,7 +6,7 @@ module GraphNode = {
     | Token(TokenData.t)
     | Constructor(ConstructorData.t)
 
-  type t = ReactD3Graph.Node.t<unit>
+  type t = ReactD3Graph.Node.t<[#token | #constructor]>
 
   let unselectedFill = "white"
   let selectedFill = "rgb(220, 220, 220)"
@@ -69,11 +69,11 @@ module GraphNode = {
     )
 
   let create = (id, ~x, ~y, payload) => {
-    let config = switch payload {
-    | Token(data) => tokenConfig(data)
-    | Constructor(data) => constructorConfig(data)
+    let (config, payload) = switch payload {
+    | Token(data) => (tokenConfig(data), #token)
+    | Constructor(data) => (constructorConfig(data), #constructor)
     }
-    ReactD3Graph.Node.create(~id=fromGid(id), ~payload=(), ~x, ~y, ~config, ())
+    ReactD3Graph.Node.create(~id=fromGid(id), ~payload, ~x, ~y, ~config, ())
   }
 
   let data = t => [t]
@@ -85,12 +85,83 @@ module GraphNode = {
 module GraphLink = {
   type t = ReactD3Graph.Link.t<int>
 
+  let makeConfig = () => {
+    ReactD3Graph.Link.Config.create(
+      ~offsetSource={
+        (src, tgt, breakPoints) =>
+          (src, tgt)
+          ->Option.both
+          ->Option.map(((src, tgt)) => {
+            let (x1, y1) = (src["x"], src["y"])
+            let (x2, y2) = (tgt["x"], tgt["y"])
+            let size = src->ReactD3Graph.Core.readKeyExn("size")
+            switch src->ReactD3Graph.Core.readKeyExn("payload") {
+            | #constructor => {
+                let (x, y) = (x2 -. x1, y2 -. y1)
+                let l = Js.Math.hypot(x, y)
+                let (dx, dy) = (x /. l, y /. l)
+                {"dx": size["width"] /. 20. *. dx, "dy": size["height"] /. 20. *. dy}
+              }
+            | #token => {
+                let (dx0, dy0) = (x2 -. x1, y2 -. y1)
+                let (dx, dy) = if Js.Math.abs_float(dx0 /. dy0) > size["width"] /. size["height"] {
+                  let dx = size["width"] /. 20. *. Js.Math.sign_float(dx0)
+                  let dy = dy0 *. dx /. dx0
+                  (dx, dy)
+                } else {
+                  let dy = size["height"] /. 20. *. Js.Math.sign_float(dy0)
+                  let dx = dx0 *. dy /. dy0
+                  (dx, dy)
+                }
+                {"dx": dx, "dy": dy}
+              }
+            }
+          })
+          ->Option.getWithDefault({"dx": 0.0, "dy": 0.0})
+      },
+      ~offsetTarget={
+        (src, tgt, breakPoints) =>
+          (src, tgt)
+          ->Option.both
+          ->Option.map(((src, tgt)) => {
+            let (x1, y1) = (src["x"], src["y"])
+            let (x2, y2) = (tgt["x"], tgt["y"])
+            let size = tgt->ReactD3Graph.Core.readKeyExn("size")
+            switch tgt->ReactD3Graph.Core.readKeyExn("payload") {
+            | #constructor => {
+                let (x, y) = (x1 -. x2, y1 -. y2)
+                let l = Js.Math.hypot(x, y)
+                let (dx, dy) = (x /. l, y /. l)
+                {"dx": size["width"] /. 20. *. dx, "dy": size["height"] /. 20. *. dy}
+              }
+            | #token => {
+                let (dx0, dy0) = (x1 -. x2, y1 -. y2)
+                let (dx, dy) = if Js.Math.abs_float(dx0 /. dy0) > size["width"] /. size["height"] {
+                  let dx = size["width"] /. 20. *. Js.Math.sign_float(dx0)
+                  let dy = dy0 *. dx /. dx0
+                  (dx, dy)
+                } else {
+                  let dy = size["height"] /. 20. *. Js.Math.sign_float(dy0)
+                  let dx = dx0 *. dy /. dy0
+                  (dx, dy)
+                }
+                {"dx": dx, "dy": dy}
+              }
+            }
+          })
+          ->Option.getWithDefault({"dx": 0.0, "dy": 0.0})
+      },
+      (),
+    )
+  }
+
   let create = (id, ~source, ~target) =>
     ReactD3Graph.Link.create(
       ~source=fromGid(source),
       ~target=fromGid(target),
       ~id=Gid.toString(id)->ReactD3Graph.Link.Id.ofString,
       ~payload=0,
+      ~config=makeConfig(),
       (),
     )
 
