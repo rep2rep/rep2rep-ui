@@ -20,6 +20,7 @@
     "@rescript/react": "^0.10.3",
     "@ryyppy/rescript-promise": "^2.1.0",
     "bs-fetch": "^0.6.2",
+    "RepWeb": "file:../RepWeb",
     "rescript-react-d3-graph": "file:../rescript-react-d3-graph",
     "rescript-react-draggable-list": "file:../rescript-react-draggable-list"
   }

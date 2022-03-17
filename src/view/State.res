@@ -11,8 +11,8 @@ module Construction = {
 
   type t = {
     metadata: Metadata.t,
-    tokenData: Uuid.Map.t<TokenData.t>,
-    constructorData: Uuid.Map.t<ConstructorData.t>,
+    tokenData: Gid.Map.t<TokenData.t>,
+    constructorData: Gid.Map.t<ConstructorData.t>,
     graph: GraphState.t,
   }
 
@@ -21,29 +21,29 @@ module Construction = {
 
   let create = name => {
     metadata: Metadata.create(name),
-    tokenData: Uuid.Map.empty(),
-    constructorData: Uuid.Map.empty(),
+    tokenData: Gid.Map.empty(),
+    constructorData: Gid.Map.empty(),
     graph: GraphState.empty,
   }
 
   let duplicate = t => {
-    let idMap = Uuid.Map.merge(t.tokenData, t.constructorData, (_, _, _) => Some(Uuid.create()))
-    let mapUpdate: (Uuid.Map.t<'a>, (Uuid.t, 'a) => (Uuid.t, 'b)) => Uuid.Map.t<'b> = (map, f) => {
-      let newMap = ref(Uuid.Map.empty())
-      map->Uuid.Map.forEach((id, value) => {
+    let idMap = Gid.Map.merge(t.tokenData, t.constructorData, (_, _, _) => Some(Gid.create()))
+    let mapUpdate: (Gid.Map.t<'a>, (Gid.t, 'a) => (Gid.t, 'b)) => Gid.Map.t<'b> = (map, f) => {
+      let newMap = ref(Gid.Map.empty())
+      map->Gid.Map.forEach((id, value) => {
         let (id', value') = f(id, value)
-        newMap := newMap.contents->Uuid.Map.set(id', value')
+        newMap := newMap.contents->Gid.Map.set(id', value')
       })
       newMap.contents
     }
     {
       metadata: t.metadata->Metadata.duplicate,
       tokenData: t.tokenData->mapUpdate((id, td) => {
-        let newId = idMap->Uuid.Map.get(id)->Option.getExn
+        let newId = idMap->Gid.Map.get(id)->Option.getExn
         (newId, TokenData.duplicate(td))
       }),
       constructorData: t.constructorData->mapUpdate((id, cd) => {
-        let newId = idMap->Uuid.Map.get(id)->Option.getExn
+        let newId = idMap->Gid.Map.get(id)->Option.getExn
         (newId, ConstructorData.duplicate(cd))
       }),
       graph: t.graph->GraphState.duplicate(idMap),
@@ -56,7 +56,7 @@ module Construction = {
     let node = GraphState.GraphNode.create(id, ~x, ~y, GraphState.GraphNode.Token(tokenData))
     {
       ...t,
-      tokenData: t.tokenData->Uuid.Map.set(id, tokenData),
+      tokenData: t.tokenData->Gid.Map.set(id, tokenData),
       graph: t.graph->GraphState.addNode(node),
     }
   }
@@ -70,7 +70,7 @@ module Construction = {
     )
     {
       ...t,
-      constructorData: t.constructorData->Uuid.Map.set(id, constructorData),
+      constructorData: t.constructorData->Gid.Map.set(id, constructorData),
       graph: t.graph->GraphState.addNode(node),
     }
   }
@@ -98,23 +98,23 @@ module Construction = {
 }
 
 type t = {
-  focused: option<Uuid.t>,
-  order: array<Uuid.t>,
-  constructions: Uuid.Map.t<UndoRedo.t<Construction.t>>,
+  focused: option<Gid.t>,
+  order: array<Gid.t>,
+  constructions: Gid.Map.t<UndoRedo.t<Construction.t>>,
 }
 
 let empty = {
   focused: None,
   order: [],
-  constructions: Uuid.Map.empty(),
+  constructions: Gid.Map.empty(),
 }
 
 let focused = t => t.focused
 let constructions = t =>
   t.order->Array.keepMap(id =>
-    t.constructions->Uuid.Map.get(id)->Option.map(c => (id, UndoRedo.state(c)))
+    t.constructions->Gid.Map.get(id)->Option.map(c => (id, UndoRedo.state(c)))
   )
-let construction = (t, id) => t.constructions->Uuid.Map.get(id)->Option.map(UndoRedo.state)
+let construction = (t, id) => t.constructions->Gid.Map.get(id)->Option.map(UndoRedo.state)
 
 let load = () => None
 let store = t => ()
@@ -124,7 +124,7 @@ let newConstruction = (t, id, name) => {
   {
     focused: Some(id),
     order: t.order->Array.concat([id]),
-    constructions: t.constructions->Uuid.Map.set(id, c),
+    constructions: t.constructions->Gid.Map.set(id, c),
   }
 }
 
@@ -139,7 +139,7 @@ let deleteConstruction = (t, id) => {
   {
     focused: focused,
     order: t.order->Array.filter(id' => id' !== id),
-    constructions: t.constructions->Uuid.Map.remove(id),
+    constructions: t.constructions->Gid.Map.remove(id),
   }
 }
 
@@ -158,7 +158,7 @@ let duplicateConstruction = (t, ~oldId, ~newId) => {
         [oldId]
       }
     ),
-    constructions: t.constructions->Uuid.Map.set(newId, UndoRedo.create(construction)),
+    constructions: t.constructions->Gid.Map.set(newId, UndoRedo.create(construction)),
   })
   ->Option.getWithDefault(t)
 }
@@ -170,13 +170,13 @@ let importConstruction = (t, id, construction) => {
   {
     focused: Some(id),
     order: t.order->Array.concat([id]),
-    constructions: t.constructions->Uuid.Map.set(id, c),
+    constructions: t.constructions->Gid.Map.set(id, c),
   }
 }
 
 let updateConstruction = (t, id, f) => {
   ...t,
-  constructions: t.constructions->Uuid.Map.update(
+  constructions: t.constructions->Gid.Map.update(
     id,
     Option.map(_, ur_construction => {
       let c = UndoRedo.state(ur_construction)
@@ -188,14 +188,14 @@ let updateConstruction = (t, id, f) => {
 
 let undo = (t, id) => {
   ...t,
-  constructions: t.constructions->Uuid.Map.update(id, Option.map(_, UndoRedo.undo)),
+  constructions: t.constructions->Gid.Map.update(id, Option.map(_, UndoRedo.undo)),
 }
 let redo = (t, id) => {
   ...t,
-  constructions: t.constructions->Uuid.Map.update(id, Option.map(_, UndoRedo.redo)),
+  constructions: t.constructions->Gid.Map.update(id, Option.map(_, UndoRedo.redo)),
 }
 
 let canUndo = (t, id) =>
-  t.constructions->Uuid.Map.get(id)->Option.map(UndoRedo.canUndo)->Option.getWithDefault(false)
+  t.constructions->Gid.Map.get(id)->Option.map(UndoRedo.canUndo)->Option.getWithDefault(false)
 let canRedo = (t, id) =>
-  t.constructions->Uuid.Map.get(id)->Option.map(UndoRedo.canRedo)->Option.getWithDefault(false)
+  t.constructions->Gid.Map.get(id)->Option.map(UndoRedo.canRedo)->Option.getWithDefault(false)

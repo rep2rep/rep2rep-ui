@@ -69,15 +69,15 @@ module App = {
     let dispatchC = e =>
       focused->Option.iter(focused => dispatch(Event.ConstructionEvent(focused, e)))
 
-    let newConstruction = () => dispatch(Event.NewConstruction(Uuid.create(), "Construction"))
+    let newConstruction = () => dispatch(Event.NewConstruction(Gid.create(), "Construction"))
     let deleteConstruction = id => dispatch(Event.DeleteConstruction(id))
     let focusConstruction = id => dispatch(Event.FocusConstruction(id))
-    let duplicateConstruction = id => dispatch(Event.DuplicateConstruction(id, Uuid.create()))
+    let duplicateConstruction = id => dispatch(Event.DuplicateConstruction(id, Gid.create()))
     let renameConstruction = (id, newName) =>
       dispatch(Event.ConstructionEvent(id, Event.Construction.Rename(newName)))
     let reorderConstructions = newOrder => dispatch(Event.ReorderConstructions(newOrder))
     let importConstruction = _ => Js.Console.log("Import construction")
-    let exportConstruction = id => Js.Console.log("Export construction " ++ Uuid.toString(id))
+    let exportConstruction = id => Js.Console.log("Export construction " ++ Gid.toString(id))
 
     let canUndo = focused->Option.map(State.canUndo(state))->Option.getWithDefault(false)
     let canRedo = focused->Option.map(State.canRedo(state))->Option.getWithDefault(false)
@@ -85,15 +85,14 @@ module App = {
     let redo = _ => focused->Option.iter(focused => dispatch(Event.Redo(focused)))
 
     let toolbarActive = focused->Option.isSome
-    let addTokenNodeAt = (_, ~x, ~y) => dispatchC(Event.Construction.AddToken(Uuid.create(), x, y))
+    let addTokenNodeAt = (_, ~x, ~y) => dispatchC(Event.Construction.AddToken(Gid.create(), x, y))
     let addConstructorNodeAt = (_, ~x, ~y) =>
-      dispatchC(Event.Construction.AddConstructor(Uuid.create(), x, y))
+      dispatchC(Event.Construction.AddConstructor(Gid.create(), x, y))
     let duplicateNodes = _ => Js.Console.log("Duplicate Nodes!")
     let connectNodes = _ =>
       switch GraphState.Selection.nodes(selection) {
-      | [self] => dispatchC(Event.Construction.ConnectNodes(Uuid.create(), self, self))
-      | [source, target] =>
-        dispatchC(Event.Construction.ConnectNodes(Uuid.create(), source, target))
+      | [self] => dispatchC(Event.Construction.ConnectNodes(Gid.create(), self, self))
+      | [source, target] => dispatchC(Event.Construction.ConnectNodes(Gid.create(), source, target))
       | _ => ()
       }
     let deleteSelection = _ => {
@@ -114,7 +113,7 @@ module App = {
     }
     let movedNode = (id, ~x, ~y) =>
       dispatchC(
-        Event.Construction.MoveNode(id->ReactD3Graph.Node.Id.toString->Uuid.fromString, x, y),
+        Event.Construction.MoveNode(id->ReactD3Graph.Node.Id.toString->Gid.fromString, x, y),
       )
 
     let selectionChange = (~oldSelection as _, ~newSelection) =>
@@ -231,7 +230,7 @@ module App = {
           //     state
           //     ->State.model(focused)
           //     ->Option.map(model => {
-          //       let slots = model->State.Model.slotsForSelection(selection)->Uuid.Map.toArray
+          //       let slots = model->State.Model.slotsForSelection(selection)->Gid.Map.toArray
           //       switch slots {
           //       | [] => InspectorState.Global(State.Model.info(model))
           //       | [(id, slot)] => InspectorState.Single(id, slot)

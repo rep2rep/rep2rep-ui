@@ -1,5 +1,5 @@
-let toUuid = nodeId => nodeId->ReactD3Graph.Node.Id.toString->Uuid.fromString
-let fromUuid = uuid => uuid->Uuid.toString->ReactD3Graph.Node.Id.ofString
+let toGid = nodeId => nodeId->ReactD3Graph.Node.Id.toString->Gid.fromString
+let fromGid = uuid => uuid->Gid.toString->ReactD3Graph.Node.Id.ofString
 
 module GraphNode = {
   type nodeData =
@@ -73,12 +73,12 @@ module GraphNode = {
     | Token(data) => tokenConfig(data)
     | Constructor(data) => constructorConfig(data)
     }
-    ReactD3Graph.Node.create(~id=fromUuid(id), ~payload=(), ~x, ~y, ~config, ())
+    ReactD3Graph.Node.create(~id=fromGid(id), ~payload=(), ~x, ~y, ~config, ())
   }
 
   let data = t => [t]
-  let id = t => ReactD3Graph.Node.id(t)->toUuid
-  let duplicate = (t, newId) => t->ReactD3Graph.Node.setId(newId->fromUuid)
+  let id = t => ReactD3Graph.Node.id(t)->toGid
+  let duplicate = (t, newId) => t->ReactD3Graph.Node.setId(newId->fromGid)
   let move = (t, ~x, ~y) => t->ReactD3Graph.Node.setX(x)->ReactD3Graph.Node.setY(y)
 }
 
@@ -87,28 +87,28 @@ module GraphLink = {
 
   let create = (id, ~source, ~target) =>
     ReactD3Graph.Link.create(
-      ~source=fromUuid(source),
-      ~target=fromUuid(target),
-      ~id=Uuid.toString(id)->ReactD3Graph.Link.Id.ofString,
+      ~source=fromGid(source),
+      ~target=fromGid(target),
+      ~id=Gid.toString(id)->ReactD3Graph.Link.Id.ofString,
       ~payload=0,
       (),
     )
 
   let data = t => [t]
   let id = t =>
-    ReactD3Graph.Link.id(t)->Option.getExn->ReactD3Graph.Link.Id.toString->Uuid.fromString
-  let source = t => ReactD3Graph.Link.source(t)->toUuid
-  let target = t => ReactD3Graph.Link.target(t)->toUuid
+    ReactD3Graph.Link.id(t)->Option.getExn->ReactD3Graph.Link.Id.toString->Gid.fromString
+  let source = t => ReactD3Graph.Link.source(t)->toGid
+  let target = t => ReactD3Graph.Link.target(t)->toGid
   let duplicate = (t, newSource, newTarget) =>
     t
-    ->ReactD3Graph.Link.setSource(newSource->fromUuid)
-    ->ReactD3Graph.Link.setTarget(newTarget->fromUuid)
+    ->ReactD3Graph.Link.setSource(newSource->fromGid)
+    ->ReactD3Graph.Link.setTarget(newTarget->fromGid)
 }
 
 module Selection = {
   type t = {
-    nodes: array<Uuid.t>,
-    links: array<Uuid.t>,
+    nodes: array<Gid.t>,
+    links: array<Gid.t>,
   }
 
   let empty = {
@@ -119,13 +119,13 @@ module Selection = {
   let nodes = t => t.nodes
   let links = t => t.links
   let toReactD3Selection = t => {
-    ReactD3Graph.Graph.Selection.nodes: t.nodes->Array.map(fromUuid),
-    links: t.links->Array.map(id => id->Uuid.toString->ReactD3Graph.Link.Id.ofString),
+    ReactD3Graph.Graph.Selection.nodes: t.nodes->Array.map(fromGid),
+    links: t.links->Array.map(id => id->Gid.toString->ReactD3Graph.Link.Id.ofString),
   }
   let fromReactD3Selection = selection => {
-    nodes: selection.ReactD3Graph.Graph.Selection.nodes->Array.map(toUuid),
+    nodes: selection.ReactD3Graph.Graph.Selection.nodes->Array.map(toGid),
     links: selection.ReactD3Graph.Graph.Selection.links->Array.map(id =>
-      id->ReactD3Graph.Link.Id.toString->Uuid.fromString
+      id->ReactD3Graph.Link.Id.toString->Gid.fromString
     ),
   }
 }
@@ -144,12 +144,12 @@ let empty = {
 
 let duplicate = (t, idMap) => {
   nodes: t.nodes->Array.map(node => {
-    let id = idMap->Uuid.Map.get(GraphNode.id(node))->Option.getExn
+    let id = idMap->Gid.Map.get(GraphNode.id(node))->Option.getExn
     node->GraphNode.duplicate(id)
   }),
   links: t.links->Array.map(link => {
-    let source = idMap->Uuid.Map.get(GraphLink.source(link))->Option.getExn
-    let target = idMap->Uuid.Map.get(GraphLink.target(link))->Option.getExn
+    let source = idMap->Gid.Map.get(GraphLink.source(link))->Option.getExn
+    let target = idMap->Gid.Map.get(GraphLink.target(link))->Option.getExn
     link->GraphLink.duplicate(source, target)
   }),
   selection: Selection.empty,

@@ -1,13 +1,13 @@
 module Construction = {
   type t =
     | Rename(string)
-    | AddToken(Uuid.t, float, float)
-    | AddConstructor(Uuid.t, float, float)
-    | DuplicateNode(Uuid.t, Uuid.t)
-    | ConnectNodes(Uuid.t, Uuid.t, Uuid.t)
-    | MoveNode(Uuid.t, float, float)
-    | DeleteNode(Uuid.t)
-    | DeleteLink(Uuid.t)
+    | AddToken(Gid.t, float, float)
+    | AddConstructor(Gid.t, float, float)
+    | DuplicateNode(Gid.t, Gid.t)
+    | ConnectNodes(Gid.t, Gid.t, Gid.t)
+    | MoveNode(Gid.t, float, float)
+    | DeleteNode(Gid.t)
+    | DeleteLink(Gid.t)
     | ChangeSelection(GraphState.Selection.t)
 
   let dispatch = (construction, t) =>
@@ -26,15 +26,15 @@ module Construction = {
 }
 
 type t =
-  | NewConstruction(Uuid.t, string)
-  | DeleteConstruction(Uuid.t)
-  | FocusConstruction(option<Uuid.t>)
-  | DuplicateConstruction(Uuid.t, Uuid.t)
-  | ReorderConstructions(array<Uuid.t>)
-  | ImportConstruction(Uuid.t, State.Construction.t)
-  | Undo(Uuid.t)
-  | Redo(Uuid.t)
-  | ConstructionEvent(Uuid.t, Construction.t)
+  | NewConstruction(Gid.t, string)
+  | DeleteConstruction(Gid.t)
+  | FocusConstruction(option<Gid.t>)
+  | DuplicateConstruction(Gid.t, Gid.t)
+  | ReorderConstructions(array<Gid.t>)
+  | ImportConstruction(Gid.t, State.Construction.t)
+  | Undo(Gid.t)
+  | Redo(Gid.t)
+  | ConstructionEvent(Gid.t, Construction.t)
 
 let dispatch = (state, t) =>
   switch t {

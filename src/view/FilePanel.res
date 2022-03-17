@@ -51,8 +51,8 @@ module FileLabel = {
         },
         (),
       )}
-      id={"file-label-" ++ Uuid.toString(id)}
-      key={Uuid.toString(id)}
+      id={"file-label-" ++ Gid.toString(id)}
+      key={Gid.toString(id)}
       className={if active {
         "file-active"
       } else {
@@ -150,7 +150,7 @@ module Template = {
 @react.component
 let make = (
   ~id,
-  ~constructions: array<(Uuid.t, State.Construction.t)>,
+  ~constructions: array<(Gid.t, State.Construction.t)>,
   ~active,
   ~onCreate,
   ~onDelete,
@@ -188,7 +188,7 @@ let make = (
       onClick={_ => onSelect(None)}>
       <ReactDraggableList.DraggableList
         items={constructions}
-        itemKey={((id, _)) => id->Uuid.toString}
+        itemKey={((id, _)) => id->Gid.toString}
         template={Template.make}
         onMoveEnd={(~newList, ~movedItem as _, ~oldIndex as _, ~newIndex as _) =>
           onReorder(newList->Array.map(((id, _)) => id))}
