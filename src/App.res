@@ -180,20 +180,28 @@ module App = {
             ~padding="0 0.5rem",
             (),
           )}>
-          <Button onClick={undo} value="Undo" enabled={canUndo} />
-          <Button onClick={redo} value="Redo" enabled={canRedo} />
+          <Button onClick={undo} value="Undo" enabled={canUndo} tooltip="Cmd+Z" />
+          <Button onClick={redo} value="Redo" enabled={canRedo} tooltip="Cmd+Shift+Z" />
           <Button.Separator />
-          <Button onClick={addTokenNodeAt(_, ~x=0., ~y=0.)} value="Token" enabled={toolbarActive} />
+          <Button
+            onClick={addTokenNodeAt(_, ~x=0., ~y=0.)}
+            value="Token"
+            enabled={toolbarActive}
+            tooltip="T"
+          />
           <Button
             onClick={addConstructorNodeAt(_, ~x=0., ~y=0.)}
             value="Constructor"
             enabled={toolbarActive}
+            tooltip="C"
           />
-          <Button onClick={duplicateNodes} value="Duplicate" enabled={toolbarActive} />
+          <Button
+            onClick={duplicateNodes} value="Duplicate" enabled={toolbarActive} tooltip="Ctrl+D"
+          />
           <Button.Separator />
-          <Button onClick={connectNodes} value="Connect" enabled={toolbarActive} />
+          <Button onClick={connectNodes} value="Connect" enabled={toolbarActive} tooltip="E" />
           <Button.Separator />
-          <Button onClick={deleteSelection} value="Delete" enabled={toolbarActive} />
+          <Button onClick={deleteSelection} value="Delete" enabled={toolbarActive} tooltip="X" />
           // <Button.Separator />
           // <a href="manual.html" target="_blank"> {React.string("Manual")} </a>
         </div>
