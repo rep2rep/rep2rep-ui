@@ -69,15 +69,15 @@ module App = {
     let dispatchC = e =>
       focused->Option.iter(focused => dispatch(Event.ConstructionEvent(focused, e)))
 
-    let newConstruction = () => dispatch(Event.NewConstruction(Gid.create(), "Construction"))
+    let newConstruction = () => dispatch(Event.NewConstruction(Gid.create(), "Structure graph"))
     let deleteConstruction = id => dispatch(Event.DeleteConstruction(id))
     let focusConstruction = id => dispatch(Event.FocusConstruction(id))
     let duplicateConstruction = id => dispatch(Event.DuplicateConstruction(id, Gid.create()))
     let renameConstruction = (id, newName) =>
       dispatch(Event.ConstructionEvent(id, Event.Construction.Rename(newName)))
     let reorderConstructions = newOrder => dispatch(Event.ReorderConstructions(newOrder))
-    let importConstruction = _ => Js.Console.log("Import construction")
-    let exportConstruction = id => Js.Console.log("Export construction " ++ Gid.toString(id))
+    let importConstructions = _ => Dialog.alert("Importing structure graphs is not yet supported")
+    let exportConstruction = id => Dialog.alert("Exporting structure graphs " ++ Gid.toString(id))
 
     let canUndo = focused->Option.map(State.canUndo(state))->Option.getWithDefault(false)
     let canRedo = focused->Option.map(State.canRedo(state))->Option.getWithDefault(false)
@@ -156,7 +156,7 @@ module App = {
         onDuplicate={duplicateConstruction}
         onChangedName={renameConstruction}
         onReorder={reorderConstructions}
-        onImport={importConstruction}
+        onImport={importConstructions}
         onExport={exportConstruction}
       />
       <div

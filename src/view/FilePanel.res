@@ -162,6 +162,7 @@ let make = (
   ~onExport,
 ) => {
   let container = React.useRef(Js.Nullable.null)
+  let (dropTargetActive, setDropTargetActive) = React.useState(() => false)
   <HideablePanel2
     id
     toggle={(~hidden) =>
@@ -208,7 +209,13 @@ let make = (
       {React.string("V ##VERSION##")}
     </div>
     <div
-      style={ReactDOM.Style.make(~flexGrow="1", ~display="flex", ~flexDirection="column", ())}
+      style={ReactDOM.Style.make(
+        ~flexGrow="1",
+        ~display="flex",
+        ~flexDirection="column",
+        ~overflowY="auto",
+        (),
+      )}
       onClick={_ => onSelect(None)}>
       <ReactDraggableList.DraggableList
         items={constructions}
@@ -224,6 +231,50 @@ let make = (
           "onSelect": onSelect,
           "onChangedName": onChangedName,
         }
+      />
+      <div
+        style={ReactDOM.Style.make(
+          ~flexGrow="1",
+          ~minHeight="50px",
+          ~background={
+            if dropTargetActive {
+              "rgba(0,0,0,0.1)"
+            } else {
+              "none"
+            }
+          },
+          ~border={
+            if dropTargetActive {
+              "2px solid rgba(0,0,0,0.2)"
+            } else {
+              "none"
+            }
+          },
+          (),
+        )}
+        onDragEnter={e => {
+          ReactEvent.Mouse.preventDefault(e)
+          setDropTargetActive(_ => true)
+        }}
+        onDragOver={e => ReactEvent.Mouse.preventDefault(e)}
+        onDragLeave={e => setDropTargetActive(_ => false)}
+        onDrop={e => {
+          ReactEvent.Mouse.preventDefault(e)
+          setDropTargetActive(_ => false)
+          let files: array<File.t> = Obj.magic(e)["dataTransfer"]["files"] // Absolute hack
+          let (keep, reject) = files->Array.partition(f => File.name(f)->String.endsWith(".r2r"))
+          if keep != [] {
+            onImport(keep)
+          }
+          if reject != [] {
+            Dialog.alert(
+              "Could not upload files:\n" ++
+              reject
+              ->Array.map(f => "  " ++ File.name(f) ++ "\n")
+              ->Js.Array2.joinWith("") ++ "Not '.r2r' files.",
+            )
+          }
+        }}
       />
     </div>
     <div
@@ -259,7 +310,7 @@ let make = (
                 ->(((_, model)) => model)
                 ->State.Construction.metadata
                 ->State.Construction.Metadata.name
-              if Dialog.confirm("Definitely delete model '" ++ name ++ "'?") {
+              if Dialog.confirm("Definitely delete structure graph '" ++ name ++ "'?") {
                 onDelete(active)
               }
             })}
@@ -280,7 +331,8 @@ let make = (
           name="import_models"
           id="import_models"
           type_="file"
-          accept=".repn"
+          accept=".r2r"
+          multiple={true}
           style={ReactDOM.Style.make(
             ~width="0.1px",
             ~height="0.1px",
@@ -293,8 +345,8 @@ let make = (
           onChange={e => {
             let files = e->ReactEvent.Form.currentTarget->(t => t["files"])
             switch files {
-            | [f] => onImport(f)
-            | _ => ()
+            | [] => ()
+            | fs => onImport(fs)
             }
           }}
         />
