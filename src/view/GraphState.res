@@ -44,26 +44,29 @@ module GraphNode = {
       (),
     )
   }
-  let constructorConfig = _ =>
+  let constructorConfig = content =>
     ReactD3Graph.Node.Config.create(
-      ~size={"width": 120., "height": 120.},
+      ~size={"height": 170., "width": 170. +. String.approximateEmWidth(content) *. 150.},
       ~viewGenerator=node => {
-        <circle
-          cx="6"
-          cy="6"
-          r="5"
-          fill={if ReactD3Graph.Node.selected(node) {
-            selectedFill
-          } else {
-            unselectedFill
-          }}
-          stroke="black"
-          strokeWidth={if ReactD3Graph.Node.selected(node) {
-            selectedStrokeWidth
-          } else {
-            unselectedStrokeWidth
-          }}
-        />
+        <>
+          <circle
+            cx="6"
+            cy="6"
+            r="5"
+            fill={if ReactD3Graph.Node.selected(node) {
+              selectedFill
+            } else {
+              unselectedFill
+            }}
+            stroke="black"
+            strokeWidth={if ReactD3Graph.Node.selected(node) {
+              selectedStrokeWidth
+            } else {
+              unselectedStrokeWidth
+            }}
+          />
+          <text x="15" y="15"> {React.string(content)} </text>
+        </>
       },
       (),
     )
@@ -86,70 +89,46 @@ module GraphLink = {
   type t = ReactD3Graph.Link.t<int>
 
   let makeConfig = () => {
+    let offset = (src, tgt, _) =>
+      (src, tgt)
+      ->Option.both
+      ->Option.map(((src, tgt)) => {
+        let (x1, y1) = (src["x"], src["y"])
+        let (x2, y2) = (tgt["x"], tgt["y"])
+        let size = src->ReactD3Graph.Core.readKeyExn("size")
+        switch src->ReactD3Graph.Core.readKeyExn("payload") {
+        | #constructor => {
+            let (x, y) = (x2 -. x1, y2 -. y1)
+            let l = Js.Math.hypot(x, y)
+            let (dx, dy) = (x /. l, y /. l)
+            {
+              "dx": 6. *. dx -. size["width"] /. 20. +. 6.,
+              "dy": 6. *. dy -. size["height"] /. 20. +. 6.,
+            }
+          }
+        | #token => {
+            let (dx0, dy0) = (x2 -. x1, y2 -. y1)
+            let (dx, dy) = if Js.Math.abs_float(dx0 /. dy0) > size["width"] /. size["height"] {
+              let dx = size["width"] /. 20. *. Js.Math.sign_float(dx0)
+              let dy = dy0 *. dx /. dx0
+              (dx, dy)
+            } else {
+              let dy = size["height"] /. 20. *. Js.Math.sign_float(dy0)
+              let dx = dx0 *. dy /. dy0
+              (dx, dy)
+            }
+            {"dx": dx, "dy": dy}
+          }
+        }
+      })
+      ->Option.getWithDefault({"dx": 0.0, "dy": 0.0})
+
     ReactD3Graph.Link.Config.create(
       ~offsetSource={
-        (src, tgt, breakPoints) =>
-          (src, tgt)
-          ->Option.both
-          ->Option.map(((src, tgt)) => {
-            let (x1, y1) = (src["x"], src["y"])
-            let (x2, y2) = (tgt["x"], tgt["y"])
-            let size = src->ReactD3Graph.Core.readKeyExn("size")
-            switch src->ReactD3Graph.Core.readKeyExn("payload") {
-            | #constructor => {
-                let (x, y) = (x2 -. x1, y2 -. y1)
-                let l = Js.Math.hypot(x, y)
-                let (dx, dy) = (x /. l, y /. l)
-                {"dx": size["width"] /. 20. *. dx, "dy": size["height"] /. 20. *. dy}
-              }
-            | #token => {
-                let (dx0, dy0) = (x2 -. x1, y2 -. y1)
-                let (dx, dy) = if Js.Math.abs_float(dx0 /. dy0) > size["width"] /. size["height"] {
-                  let dx = size["width"] /. 20. *. Js.Math.sign_float(dx0)
-                  let dy = dy0 *. dx /. dx0
-                  (dx, dy)
-                } else {
-                  let dy = size["height"] /. 20. *. Js.Math.sign_float(dy0)
-                  let dx = dx0 *. dy /. dy0
-                  (dx, dy)
-                }
-                {"dx": dx, "dy": dy}
-              }
-            }
-          })
-          ->Option.getWithDefault({"dx": 0.0, "dy": 0.0})
+        (src, tgt, breakPoints) => offset(src, tgt, breakPoints)
       },
       ~offsetTarget={
-        (src, tgt, breakPoints) =>
-          (src, tgt)
-          ->Option.both
-          ->Option.map(((src, tgt)) => {
-            let (x1, y1) = (src["x"], src["y"])
-            let (x2, y2) = (tgt["x"], tgt["y"])
-            let size = tgt->ReactD3Graph.Core.readKeyExn("size")
-            switch tgt->ReactD3Graph.Core.readKeyExn("payload") {
-            | #constructor => {
-                let (x, y) = (x1 -. x2, y1 -. y2)
-                let l = Js.Math.hypot(x, y)
-                let (dx, dy) = (x /. l, y /. l)
-                {"dx": size["width"] /. 20. *. dx, "dy": size["height"] /. 20. *. dy}
-              }
-            | #token => {
-                let (dx0, dy0) = (x1 -. x2, y1 -. y2)
-                let (dx, dy) = if Js.Math.abs_float(dx0 /. dy0) > size["width"] /. size["height"] {
-                  let dx = size["width"] /. 20. *. Js.Math.sign_float(dx0)
-                  let dy = dy0 *. dx /. dx0
-                  (dx, dy)
-                } else {
-                  let dy = size["height"] /. 20. *. Js.Math.sign_float(dy0)
-                  let dx = dx0 *. dy /. dy0
-                  (dx, dy)
-                }
-                {"dx": dx, "dy": dy}
-              }
-            }
-          })
-          ->Option.getWithDefault({"dx": 0.0, "dy": 0.0})
+        (src, tgt, breakPoints) => offset(tgt, src, breakPoints)
       },
       (),
     )
