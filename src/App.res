@@ -1,3 +1,5 @@
+module BoolStore = LocalStorage.MakeJsonable(Bool)
+
 module App = {
   // let forAaron: unit => Rpc.Response.t<Constructions.construction> = Rpc_service.require(
   //   "aarons.forAaron",
@@ -138,6 +140,20 @@ module App = {
       ("Ctrl+d", (e, ~x as _, ~y as _) => duplicateNodes(e)),
     ])
 
+    let (showGrid, setShowGrid) = React.useState(_ => {
+      BoolStore.get("REP-SHOW-GRID")->Or_error.getWithDefault(false)
+    })
+
+    let toggleGrid = _ => {
+      if showGrid {
+        BoolStore.set("REP-SHOW-GRID", false)
+        setShowGrid(_ => false)
+      } else {
+        BoolStore.set("REP-SHOW-GRID", true)
+        setShowGrid(_ => true)
+      }
+    }
+
     <main
       style={ReactDOM.Style.make(
         ~display="flex",
@@ -202,6 +218,16 @@ module App = {
           <Button onClick={connectNodes} value="Connect" enabled={toolbarActive} tooltip="E" />
           <Button.Separator />
           <Button onClick={deleteSelection} value="Delete" enabled={toolbarActive} tooltip="X" />
+          <Button.Separator />
+          <label htmlFor="gridToggle"> {React.string("Grid")} </label>
+          <input
+            type_="checkbox"
+            label="gridToggle"
+            onChange={toggleGrid}
+            checked={showGrid}
+            style={ReactDOM.Style.make(~marginLeft="0.5em", ())}
+          />
+
           // <Button.Separator />
           // <a href="manual.html" target="_blank"> {React.string("Manual")} </a>
         </div>
@@ -228,6 +254,7 @@ module App = {
             onSelectionChange={selectionChange}
             onNodePositionChange={movedNode}
             keybindings={keybindings}
+            showGrid
             style={ReactDOM.Style.make(~flexGrow="1", ())}
           />
           // <InspectorPanel
