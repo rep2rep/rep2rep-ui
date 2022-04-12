@@ -123,6 +123,8 @@ module App = {
         Event.Construction.ChangeSelection(GraphState.Selection.fromReactD3Selection(newSelection)),
       )
 
+    let inspectorChange = e => dispatchC(e)
+
     module K = GlobalKeybindings.KeyBinding
     GlobalKeybindings.set([
       K.create("Cmd+z", undo),
@@ -257,24 +259,22 @@ module App = {
             showGrid
             style={ReactDOM.Style.make(~flexGrow="1", ())}
           />
-          // <InspectorPanel
-          //   id={"node_inspector"}
-          //   onChange=slotsChange
-          //   data={focused
-          //   ->Option.flatMap(focused =>
-          //     state
-          //     ->State.model(focused)
-          //     ->Option.map(model => {
-          //       let slots = model->State.Model.slotsForSelection(selection)->Gid.Map.toArray
-          //       switch slots {
-          //       | [] => InspectorState.Global(State.Model.info(model))
-          //       | [(id, slot)] => InspectorState.Single(id, slot)
-          //       | multi => InspectorState.Multiple(multi)
-          //       }
-          //     })
-          //   )
-          //   ->Option.getWithDefault(InspectorState.Empty)}
-          // />
+          <Inspector
+            id={"node_inspector"}
+            onChange=inspectorChange
+            data={focused
+            ->Option.flatMap(focused =>
+              state
+              ->State.construction(focused)
+              ->Option.map(construction =>
+                selection
+                ->GraphState.Selection.nodes
+                ->Array.mapPartial(node => construction->State.Construction.getNode(node))
+              )
+            )
+            ->Option.getWithDefault([])}
+            nodeIds={selection->GraphState.Selection.nodes}
+          />
         </div>
       </div>
     </main>

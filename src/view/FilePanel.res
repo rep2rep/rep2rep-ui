@@ -171,7 +171,7 @@ let make = (
           ~cursor="default",
           ~userSelect="none",
           ~position="absolute",
-          ~bottom="5px",
+          ~top="40px",
           ~zIndex="100000",
           ~left={
             if hidden {
