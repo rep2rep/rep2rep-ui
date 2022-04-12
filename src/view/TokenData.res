@@ -1,9 +1,30 @@
-type t = string
+type t = {
+  label: string,
+  payload: option<string>,
+  type_: option<Type.typ>,
+  subtype: option<string>,
+  notes: string,
+}
 
-let duplicate = t => t
+let create = (~payload=?, ~type_=?, ~subtype=?, ~notes="", label) => {
+  label: label,
+  payload: payload,
+  type_: type_,
+  subtype: subtype,
+  notes: notes,
+}
 
-let size = t => {"width": String.length(t)->(f => f * 10)->Int.toFloat, "height": 20.}
+let duplicate = t => {
+  label: t.label,
+  payload: t.payload,
+  type_: t.type_,
+  subtype: t.subtype,
+  notes: t.notes,
+}
+
+let size = t =>
+  {"width": String.length(t.label)->(f => f * 10)->Int.toFloat->Float.max(20.), "height": 20.}
 let render = t =>
   <text x={"50%"} y={"50%"} textAnchor="middle" dominantBaseline="central">
-    {React.string(t)}
+    {React.string(t.label)}
   </text>

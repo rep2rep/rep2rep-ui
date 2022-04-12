@@ -52,7 +52,7 @@ module Construction = {
 
   let rename = (t, name) => {...t, metadata: t.metadata->Metadata.setName(name)}
   let addToken = (t, id, ~x, ~y) => {
-    let tokenData = "tok"
+    let tokenData = TokenData.create("tok")
     let node = GraphState.GraphNode.create(id, ~x, ~y, GraphState.GraphNode.Token(tokenData))
     {
       ...t,
@@ -61,7 +61,7 @@ module Construction = {
     }
   }
   let addConstructor = (t, id, ~x, ~y) => {
-    let constructorData = "con"
+    let constructorData = ConstructorData.create("con")
     let node = GraphState.GraphNode.create(
       id,
       ~x,

@@ -44,9 +44,9 @@ module GraphNode = {
       (),
     )
   }
-  let constructorConfig = content =>
+  let constructorConfig = (content: ConstructorData.t) =>
     ReactD3Graph.Node.Config.create(
-      ~size={"height": 170., "width": 170. +. String.approximateEmWidth(content) *. 150.},
+      ~size={"height": 190., "width": 170. +. String.approximateEmWidth(content.label) *. 150.},
       ~viewGenerator=node => {
         <>
           <circle
@@ -65,7 +65,7 @@ module GraphNode = {
               unselectedStrokeWidth
             }}
           />
-          <text x="15" y="15"> {React.string(content)} </text>
+          <text x="15" y="15"> {React.string(content.label)} </text>
         </>
       },
       (),
