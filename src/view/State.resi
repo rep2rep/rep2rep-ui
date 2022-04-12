@@ -13,12 +13,15 @@ module Construction: {
   let rename: (t, string) => t
   let addToken: (t, Gid.t, ~x: float, ~y: float) => t
   let addConstructor: (t, Gid.t, ~x: float, ~y: float) => t
+  let updateToken: (t, Gid.t, TokenData.t => TokenData.t) => t
+  let updateConstructor: (t, Gid.t, ConstructorData.t => ConstructorData.t) => t
   let duplicateNode: (t, ~oldId: Gid.t, ~newId: Gid.t) => t
   let connect: (t, ~linkId: Gid.t, ~source: Gid.t, ~target: Gid.t) => t
   let moveNode: (t, Gid.t, ~x: float, ~y: float) => t
   let deleteNode: (t, Gid.t) => t
   let deleteLink: (t, Gid.t) => t
   let setSelection: (t, GraphState.Selection.t) => t
+  let getNode: (t, Gid.t) => option<[#token(TokenData.t) | #constructor(ConstructorData.t)]>
 }
 
 type t

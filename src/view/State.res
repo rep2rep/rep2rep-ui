@@ -74,6 +74,34 @@ module Construction = {
       graph: t.graph->GraphState.addNode(node),
     }
   }
+  let updateToken = (t, id, f) => {
+    t.tokenData
+    ->Gid.Map.get(id)
+    ->Option.map(f)
+    ->Option.map(newData => {
+      ...t,
+      tokenData: t.tokenData->Gid.Map.set(id, newData),
+      graph: t.graph->GraphState.updateNode(
+        id,
+        GraphState.GraphNode.setData(_, GraphState.GraphNode.Token(newData)),
+      ),
+    })
+    ->Option.getWithDefault(t)
+  }
+  let updateConstructor = (t, id, f) => {
+    t.constructorData
+    ->Gid.Map.get(id)
+    ->Option.map(f)
+    ->Option.map(newData => {
+      ...t,
+      constructorData: t.constructorData->Gid.Map.set(id, newData),
+      graph: t.graph->GraphState.updateNode(
+        id,
+        GraphState.GraphNode.setData(_, GraphState.GraphNode.Constructor(newData)),
+      ),
+    })
+    ->Option.getWithDefault(t)
+  }
   let moveNode = (t, id, ~x, ~y) => {
     ...t,
     graph: t.graph->GraphState.updateNode(id, GraphState.GraphNode.move(_, ~x, ~y)),
@@ -87,14 +115,24 @@ module Construction = {
   }
   let deleteNode = (t, id) => {
     ...t,
-    // TODO: remove node data from everywhere
     graph: t.graph->GraphState.deleteNode(id),
+    tokenData: t.tokenData->Gid.Map.remove(id),
+    constructorData: t.constructorData->Gid.Map.remove(id),
   }
   let deleteLink = (t, link) => {
     ...t,
     graph: t.graph->GraphState.deleteLink(link),
   }
   let setSelection = (t, selection) => {...t, graph: t.graph->GraphState.setSelection(selection)}
+
+  let getNode = (t, id) =>
+    if t.tokenData->Gid.Map.has(id) {
+      Some(#token(t.tokenData->Gid.Map.get(id)->Option.getExn))
+    } else if t.constructorData->Gid.Map.has(id) {
+      Some(#constructor(t.constructorData->Gid.Map.get(id)->Option.getExn))
+    } else {
+      None
+    }
 }
 
 type t = {

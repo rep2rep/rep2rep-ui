@@ -8,6 +8,7 @@ module GraphNode: {
   let create: (Gid.t, ~x: float, ~y: float, nodeData) => t
   let data: t => array<ReactD3Graph.Node.t<[#token | #constructor]>>
   let move: (t, ~x: float, ~y: float) => t
+  let setData: (t, nodeData) => t
 }
 
 module GraphLink: {

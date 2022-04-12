@@ -1,3 +1,27 @@
+module Token = {
+  type t =
+    | Label(string)
+    | Notes(string)
+
+  let dispatch = (token, t) =>
+    switch t {
+    | Label(l) => {...token, TokenData.label: l}
+    | Notes(n) => {...token, TokenData.notes: n}
+    }
+}
+
+module Constructor = {
+  type t =
+    | Label(string)
+    | Notes(string)
+
+  let dispatch = (constructor, t) =>
+    switch t {
+    | Label(l) => {...constructor, ConstructorData.label: l}
+    | Notes(n) => {...constructor, ConstructorData.notes: n}
+    }
+}
+
 module Construction = {
   type t =
     | Rename(string)
@@ -9,6 +33,8 @@ module Construction = {
     | DeleteNode(Gid.t)
     | DeleteLink(Gid.t)
     | ChangeSelection(GraphState.Selection.t)
+    | UpdateToken(Gid.t, Token.t)
+    | UpdateConstructor(Gid.t, Constructor.t)
 
   let dispatch = (construction, t) =>
     switch t {
@@ -22,6 +48,9 @@ module Construction = {
     | DeleteNode(id) => construction->State.Construction.deleteNode(id)
     | DeleteLink(linkId) => construction->State.Construction.deleteLink(linkId)
     | ChangeSelection(selection) => construction->State.Construction.setSelection(selection)
+    | UpdateToken(id, ev) => construction->State.Construction.updateToken(id, Token.dispatch(_, ev))
+    | UpdateConstructor(id, ev) =>
+      construction->State.Construction.updateConstructor(id, con => con->Constructor.dispatch(ev))
     }
 }
 

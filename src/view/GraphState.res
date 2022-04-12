@@ -83,6 +83,13 @@ module GraphNode = {
   let id = t => ReactD3Graph.Node.id(t)->toGid
   let duplicate = (t, newId) => t->ReactD3Graph.Node.setId(newId->fromGid)
   let move = (t, ~x, ~y) => t->ReactD3Graph.Node.setX(x)->ReactD3Graph.Node.setY(y)
+  let setData = (t, newPayload) => {
+    let config = switch newPayload {
+    | Token(data) => tokenConfig(data)
+    | Constructor(data) => constructorConfig(data)
+    }
+    ReactD3Graph.Node.updateConfig(t, _ => config)
+  }
 }
 
 module GraphLink = {
@@ -96,6 +103,7 @@ module GraphLink = {
         let (x1, y1) = (src["x"], src["y"])
         let (x2, y2) = (tgt["x"], tgt["y"])
         let size = src->ReactD3Graph.Core.readKeyExn("size")
+        let tsize = tgt->ReactD3Graph.Core.readKeyExn("size")
         switch src->ReactD3Graph.Core.readKeyExn("payload") {
         | #constructor => {
             let (x, y) = (x2 -. x1, y2 -. y1)
@@ -107,6 +115,7 @@ module GraphLink = {
             }
           }
         | #token => {
+            let (x2, y2) = (x2 -. size["width"] /. 20. +. 6., y2 -. size["height"] /. 20. +. 6.)
             let (dx0, dy0) = (x2 -. x1, y2 -. y1)
             let (dx, dy) = if Js.Math.abs_float(dx0 /. dy0) > size["width"] /. size["height"] {
               let dx = size["width"] /. 20. *. Js.Math.sign_float(dx0)
