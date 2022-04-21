@@ -24,6 +24,7 @@ module Construction = {
 
   let graph = t => t.graph
   let metadata = t => t.metadata
+  let space = t => t.space
 
   let create = name => {
     metadata: Metadata.create(name),
@@ -72,7 +73,7 @@ module Construction = {
     }
   }
   let addConstructor = (t, id, ~x, ~y) => {
-    let constructorData = ConstructorData.create("con")
+    let constructorData = ConstructorData.create()
     let node = GraphState.GraphNode.create(
       id,
       ~x,
@@ -167,6 +168,16 @@ let constructions = t =>
   )
 let construction = (t, id) => t.constructions->Gid.Map.get(id)->Option.map(UndoRedo.state)
 let spaces = t => t.spaces
+let getAvailableSpaces: unit => Rpc.Response.t<array<CSpace.conSpec>> = Rpc_service.require(
+  "aarons.demoSpaces",
+  Rpc.Datatype.unit_,
+  Array.t_rpc(CSpace.conSpec_rpc),
+)
+let loadSpaces = t =>
+  getAvailableSpaces()->Rpc.Response.map(spaces => {
+    ...t,
+    spaces: spaces->Array.map(space => (space.name, space))->String.Map.fromArray,
+  })
 
 let load = () => None
 let store = t => ()

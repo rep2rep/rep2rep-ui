@@ -12,8 +12,10 @@ module Construction: {
 
   let graph: t => GraphState.t
   let metadata: t => Metadata.t
+  let space: t => option<CSpace.conSpec>
 
   let updateMetadata: (t, Metadata.t => Metadata.t) => t
+  let setSpace: (t, option<CSpace.conSpec>) => t
   let addToken: (t, Gid.t, ~x: float, ~y: float) => t
   let addConstructor: (t, Gid.t, ~x: float, ~y: float) => t
   let updateToken: (t, Gid.t, TokenData.t => TokenData.t) => t
@@ -34,6 +36,7 @@ let focused: t => option<Gid.t>
 let constructions: t => array<(Gid.t, Construction.t)>
 let construction: (t, Gid.t) => option<Construction.t>
 let spaces: t => String.Map.t<CSpace.conSpec>
+let loadSpaces: t => Rpc.Response.t<t>
 
 let load: unit => option<t>
 let store: t => unit

@@ -168,13 +168,17 @@ module Token = {
 
 module Constructor = {
   @react.component
-  let make = (~data: ConstructorData.t, ~onChange) => {
+  let make = (~data: ConstructorData.t, ~constructors, ~onChange) => {
     <>
       <Row>
-        <Label> {React.string("Label")} </Label>
-        <Input
-          value={data.label}
-          onChange={e => ReactEvent.Form.target(e)["value"]->Event.Constructor.Label->onChange}
+        <Label> {React.string("Name")} </Label>
+        <Selector
+          name="constructor-selector"
+          current={data.constructor}
+          options={String.Map.valuesToArray(constructors)}
+          toString={c => CSpace.constructorName(c)}
+          fromString={s => constructors->String.Map.get(s)}
+          onChange={e => Event.Constructor.Constructor(e)->onChange}
         />
       </Row>
       <Notes
@@ -188,21 +192,38 @@ module Constructor = {
 
 module Construction = {
   @react.component
-  let make = (~data: State.Construction.Metadata.t, ~onChange) => {
+  let make = (~data: State.Construction.t, ~spaces, ~onChange) => {
     <>
       <Row>
         <Label> {React.string("Name")} </Label>
         <Input
-          value={State.Construction.Metadata.name(data)}
+          value={data->State.Construction.metadata->State.Construction.Metadata.name}
           onChange={e =>
-            ReactEvent.Form.target(e)["value"]->Event.Construction.Metadata.Name->onChange}
+            ReactEvent.Form.target(e)["value"]
+            ->Event.Construction.Metadata.Name
+            ->Event.Construction.UpdateMetadata
+            ->onChange}
+        />
+      </Row>
+      <Row>
+        <Label> {React.string("Space")} </Label>
+        <Selector
+          name="space-selector"
+          options={String.Map.valuesToArray(spaces)}
+          current={data->State.Construction.space}
+          toString={space => space.CSpace.name}
+          fromString={spaceName => spaces->String.Map.get(spaceName)}
+          onChange={e => Event.Construction.SetSpace(e)->onChange}
         />
       </Row>
       <Notes
         name="construction-notes"
-        value={State.Construction.Metadata.notes(data)}
+        value={data->State.Construction.metadata->State.Construction.Metadata.notes}
         onChange={e =>
-          ReactEvent.Form.target(e)["value"]->Event.Construction.Metadata.Notes->onChange}
+          ReactEvent.Form.target(e)["value"]
+          ->Event.Construction.Metadata.Notes
+          ->Event.Construction.UpdateMetadata
+          ->onChange}
       />
     </>
   }
@@ -212,8 +233,8 @@ module Data = {
   type t =
     | Nothing
     | Token(TokenData.t, Gid.t)
-    | Constructor(ConstructorData.t, Gid.t)
-    | Construction(State.Construction.Metadata.t, Gid.t)
+    | Constructor(ConstructorData.t, String.Map.t<CSpace.constructor>, Gid.t)
+    | Construction(State.Construction.t, String.Map.t<CSpace.conSpec>, Gid.t)
     | Multiple
 }
 
@@ -270,12 +291,13 @@ let make = (~id, ~data, ~nodeIds, ~onChange=?) => {
         className="inspector-panel-empty-message">
         {React.string("Select a structure graph")}
       </span>
-    | Data.Construction(data, constructionId) =>
-      <Construction data onChange={e => Event.Construction.UpdateMetadata(e)->onChange} />
+    | Data.Construction(data, spaces, constructionId) => <Construction data spaces onChange />
     | Data.Token(data, nodeId) =>
       <Token data onChange={e => Event.Construction.UpdateToken(nodeId, e)->onChange} />
-    | Data.Constructor(data, nodeId) =>
-      <Constructor data onChange={e => Event.Construction.UpdateConstructor(nodeId, e)->onChange} />
+    | Data.Constructor(data, constructors, nodeId) =>
+      <Constructor
+        data constructors onChange={e => Event.Construction.UpdateConstructor(nodeId, e)->onChange}
+      />
     | Data.Multiple =>
       <span
         style={ReactDOM.Style.make(

@@ -1,10 +1,10 @@
 type t = {
-  label: string,
+  constructor: option<CSpace.constructor>,
   notes: string,
 }
 
-let create = (~notes="", label) => {label: label, notes: notes}
+let create = (~notes="", ()) => {constructor: None, notes: notes}
 let duplicate = t => {
-  label: t.label,
+  constructor: t.constructor,
   notes: t.notes,
 }

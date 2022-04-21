@@ -60,6 +60,16 @@ module App = {
 
     let (state, dispatch) = React.useReducer(reducer, init)
 
+    React.useEffect0(() => {
+      state
+      ->State.loadSpaces
+      ->Rpc.Response.upon(state => {
+        Js.Console.log(state)
+        dispatch(Event.Update(state))
+      })
+      None
+    })
+
     let focused = state->State.focused
     let selection =
       focused
@@ -95,7 +105,7 @@ module App = {
     let addTokenNodeAt = (_, ~x, ~y) => dispatchC(Event.Construction.AddToken(Gid.create(), x, y))
     let addConstructorNodeAt = (_, ~x, ~y) =>
       dispatchC(Event.Construction.AddConstructor(Gid.create(), x, y))
-    let duplicateNodes = _ => Js.Console.log("Duplicate Nodes!")
+    // let duplicateNodes = _ => Js.Console.log("Duplicate Nodes!")
     let connectNodes = _ =>
       switch GraphState.Selection.nodes(selection) {
       | [self] => dispatchC(Event.Construction.ConnectNodes(Gid.create(), self, self))
@@ -144,7 +154,7 @@ module App = {
       ("x", (e, ~x as _, ~y as _) => deleteSelection(e)),
       ("Backspace", (e, ~x as _, ~y as _) => deleteSelection(e)),
       ("Delete", (e, ~x as _, ~y as _) => deleteSelection(e)),
-      ("Ctrl+d", (e, ~x as _, ~y as _) => duplicateNodes(e)),
+      // ("Ctrl+d", (e, ~x as _, ~y as _) => duplicateNodes(e)),
     ])
 
     let (showGrid, setShowGrid) = React.useState(_ => {
@@ -218,9 +228,9 @@ module App = {
             enabled={toolbarActive}
             tooltip="C"
           />
-          <Button
-            onClick={duplicateNodes} value="Duplicate" enabled={toolbarActive} tooltip="Ctrl+D"
-          />
+          // <Button
+          //   onClick={duplicateNodes} value="Duplicate" enabled={toolbarActive} tooltip="Ctrl+D"
+          // />
           <Button.Separator />
           <Button onClick={connectNodes} value="Connect" enabled={toolbarActive} tooltip="E" />
           <Button.Separator />
@@ -234,7 +244,6 @@ module App = {
             checked={showGrid}
             style={ReactDOM.Style.make(~marginLeft="0.5em", ())}
           />
-
           // <Button.Separator />
           // <a href="manual.html" target="_blank"> {React.string("Manual")} </a>
         </div>
@@ -276,14 +285,24 @@ module App = {
                 | [node] =>
                   switch construction->State.Construction.getNode(node) {
                   | Some(#token(data)) => Inspector.Data.Token(data, node)->Some
-                  | Some(#constructor(data)) => Inspector.Data.Constructor(data, node)->Some
+                  | Some(#constructor(data)) =>
+                    Inspector.Data.Constructor(
+                      data,
+                      construction
+                      ->State.Construction.space
+                      ->Option.map(space =>
+                        space.constructors
+                        ->FiniteSet.toArray
+                        ->Array.map(c => (CSpace.constructorName(c), c))
+                        ->String.Map.fromArray
+                      )
+                      ->Option.getWithDefault(String.Map.empty),
+                      node,
+                    )->Some
                   | _ => None
                   }
                 | [] =>
-                  Inspector.Data.Construction(
-                    State.Construction.metadata(construction),
-                    focused,
-                  )->Some
+                  Inspector.Data.Construction(construction, State.spaces(state), focused)->Some
                 | _ => Inspector.Data.Multiple->Some
                 }
               )

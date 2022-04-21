@@ -12,12 +12,12 @@ module Token = {
 
 module Constructor = {
   type t =
-    | Label(string)
+    | Constructor(option<CSpace.constructor>)
     | Notes(string)
 
   let dispatch = (constructor, t) =>
     switch t {
-    | Label(l) => {...constructor, ConstructorData.label: l}
+    | Constructor(l) => {...constructor, ConstructorData.constructor: l}
     | Notes(n) => {...constructor, ConstructorData.notes: n}
     }
 }
@@ -36,6 +36,7 @@ module Construction = {
   }
 
   type t =
+    | SetSpace(option<CSpace.conSpec>)
     | AddToken(Gid.t, float, float)
     | AddConstructor(Gid.t, float, float)
     | DuplicateNode(Gid.t, Gid.t)
@@ -50,6 +51,7 @@ module Construction = {
 
   let dispatch = (construction, t) =>
     switch t {
+    | SetSpace(space) => construction->State.Construction.setSpace(space)
     | AddToken(id, x, y) => construction->State.Construction.addToken(id, ~x, ~y)
     | AddConstructor(id, x, y) => construction->State.Construction.addConstructor(id, ~x, ~y)
     | DuplicateNode(oldId, newId) => construction->State.Construction.duplicateNode(~oldId, ~newId)
@@ -68,6 +70,7 @@ module Construction = {
 }
 
 type t =
+  | Update(State.t)
   | NewConstruction(Gid.t, string)
   | DeleteConstruction(Gid.t)
   | FocusConstruction(option<Gid.t>)
@@ -80,6 +83,7 @@ type t =
 
 let dispatch = (state, t) =>
   switch t {
+  | Update(s) => s
   | NewConstruction(id, name) => state->State.newConstruction(id, name)
   | DeleteConstruction(id) => state->State.deleteConstruction(id)
   | FocusConstruction(id) => state->State.focusConstruction(id)
