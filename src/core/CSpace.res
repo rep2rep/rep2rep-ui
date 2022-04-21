@@ -42,3 +42,6 @@ let makeConSpec = (~name, ~typeSystem, ~constructors) => {
   typeSystem: typeSystem,
   constructors: constructors,
 }
+
+let constructorName = ((name, _)) => name
+let constructorSignature = ((_, sig)) => sig

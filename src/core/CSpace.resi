@@ -23,3 +23,6 @@ let makeConSpec: (
   ~typeSystem: string,
   ~constructors: FiniteSet.t<constructor>,
 ) => conSpec
+
+let constructorName: constructor => string
+let constructorSignature: constructor => ctyp
