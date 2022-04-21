@@ -76,7 +76,12 @@ module App = {
     let focusConstruction = id => dispatch(Event.FocusConstruction(id))
     let duplicateConstruction = id => dispatch(Event.DuplicateConstruction(id, Gid.create()))
     let renameConstruction = (id, newName) =>
-      dispatch(Event.ConstructionEvent(id, Event.Construction.Rename(newName)))
+      dispatch(
+        Event.ConstructionEvent(
+          id,
+          Event.Construction.UpdateMetadata(Event.Construction.Metadata.Name(newName)),
+        ),
+      )
     let reorderConstructions = newOrder => dispatch(Event.ReorderConstructions(newOrder))
     let importConstructions = _ => Dialog.alert("Importing structure graphs is not yet supported")
     let exportConstruction = id => Dialog.alert("Exporting structure graphs " ++ Gid.toString(id))
@@ -266,13 +271,24 @@ module App = {
             ->Option.flatMap(focused =>
               state
               ->State.construction(focused)
-              ->Option.map(construction =>
-                selection
-                ->GraphState.Selection.nodes
-                ->Array.mapPartial(node => construction->State.Construction.getNode(node))
+              ->Option.flatMap(construction =>
+                switch GraphState.Selection.nodes(selection) {
+                | [node] =>
+                  switch construction->State.Construction.getNode(node) {
+                  | Some(#token(data)) => Inspector.Data.Token(data, node)->Some
+                  | Some(#constructor(data)) => Inspector.Data.Constructor(data, node)->Some
+                  | _ => None
+                  }
+                | [] =>
+                  Inspector.Data.Construction(
+                    State.Construction.metadata(construction),
+                    focused,
+                  )->Some
+                | _ => Inspector.Data.Multiple->Some
+                }
               )
             )
-            ->Option.getWithDefault([])}
+            ->Option.getWithDefault(Inspector.Data.Nothing)}
             nodeIds={selection->GraphState.Selection.nodes}
           />
         </div>

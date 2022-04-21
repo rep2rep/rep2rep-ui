@@ -22,6 +22,8 @@ let duplicate = t => {
   notes: t.notes,
 }
 
+// Perhaps we can dispatch these off to a "plugin"? E.g, if we know the RS, we send [t] to
+// a plugin which has said "I am a renderer for this RS", and get back a React component and a size.
 let size = t =>
   {"width": String.length(t.label)->(f => f * 10)->Int.toFloat->Float.max(20.), "height": 20.}
 let render = t =>

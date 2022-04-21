@@ -186,6 +186,37 @@ module Constructor = {
   }
 }
 
+module Construction = {
+  @react.component
+  let make = (~data: State.Construction.Metadata.t, ~onChange) => {
+    <>
+      <Row>
+        <Label> {React.string("Name")} </Label>
+        <Input
+          value={State.Construction.Metadata.name(data)}
+          onChange={e =>
+            ReactEvent.Form.target(e)["value"]->Event.Construction.Metadata.Name->onChange}
+        />
+      </Row>
+      <Notes
+        name="construction-notes"
+        value={State.Construction.Metadata.notes(data)}
+        onChange={e =>
+          ReactEvent.Form.target(e)["value"]->Event.Construction.Metadata.Notes->onChange}
+      />
+    </>
+  }
+}
+
+module Data = {
+  type t =
+    | Nothing
+    | Token(TokenData.t, Gid.t)
+    | Constructor(ConstructorData.t, Gid.t)
+    | Construction(State.Construction.Metadata.t, Gid.t)
+    | Multiple
+}
+
 @react.component
 let make = (~id, ~data, ~nodeIds, ~onChange=?) => {
   let onChange = onChange->Option.getWithDefault(_ => ())
@@ -225,8 +256,8 @@ let make = (~id, ~data, ~nodeIds, ~onChange=?) => {
       ~borderLeft="1px solid black",
       (),
     )}>
-    {switch (data, nodeIds) {
-    | ([], _) =>
+    {switch data {
+    | Data.Nothing =>
       <span
         style={ReactDOM.Style.make(
           ~display="block",
@@ -237,18 +268,15 @@ let make = (~id, ~data, ~nodeIds, ~onChange=?) => {
           (),
         )}
         className="inspector-panel-empty-message">
-        {React.string("Nothing selected")}
+        {React.string("Select a structure graph")}
       </span>
-    | ([node], [nodeId]) =>
-      switch node {
-      | #token(data) =>
-        <Token data onChange={e => Event.Construction.UpdateToken(nodeId, e)->onChange} />
-      | #constructor(data) =>
-        <Constructor
-          data onChange={e => Event.Construction.UpdateConstructor(nodeId, e)->onChange}
-        />
-      }
-    | _ =>
+    | Data.Construction(data, constructionId) =>
+      <Construction data onChange={e => Event.Construction.UpdateMetadata(e)->onChange} />
+    | Data.Token(data, nodeId) =>
+      <Token data onChange={e => Event.Construction.UpdateToken(nodeId, e)->onChange} />
+    | Data.Constructor(data, nodeId) =>
+      <Constructor data onChange={e => Event.Construction.UpdateConstructor(nodeId, e)->onChange} />
+    | Data.Multiple =>
       <span
         style={ReactDOM.Style.make(
           ~display="block",
@@ -259,7 +287,7 @@ let make = (~id, ~data, ~nodeIds, ~onChange=?) => {
           (),
         )}
         className="inspector-panel-multiple-message">
-        {React.string("Multiple schema selected")}
+        {React.string("Multiple nodes selected")}
       </span>
     }}
   </HideablePanel2>

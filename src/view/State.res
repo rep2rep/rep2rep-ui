@@ -1,16 +1,22 @@
 module Construction = {
   module Metadata = {
-    type t = {name: string}
+    type t = {
+      name: string,
+      notes: string,
+    }
 
     let name = t => t.name
-    let setName = (t, name) => {name: name}
-    let create = name => {name: name}
+    let notes = t => t.notes
+    let setName = (t, name) => {...t, name: name}
+    let setNotes = (t, notes) => {...t, notes: notes}
+    let create = name => {name: name, notes: ""}
 
-    let duplicate = t => {name: t.name}
+    let duplicate = t => {name: t.name, notes: t.notes}
   }
 
   type t = {
     metadata: Metadata.t,
+    space: option<CSpace.conSpec>,
     tokenData: Gid.Map.t<TokenData.t>,
     constructorData: Gid.Map.t<ConstructorData.t>,
     graph: GraphState.t,
@@ -21,23 +27,28 @@ module Construction = {
 
   let create = name => {
     metadata: Metadata.create(name),
+    space: None,
     tokenData: Gid.Map.empty(),
     constructorData: Gid.Map.empty(),
     graph: GraphState.empty,
   }
 
+  let setSpace = (t, space) => {...t, space: space}
+
+  let mapUpdate = (map, f) => {
+    let newMap = ref(Gid.Map.empty())
+    map->Gid.Map.forEach((id, value) => {
+      let (id', value') = f(id, value)
+      newMap := newMap.contents->Gid.Map.set(id', value')
+    })
+    newMap.contents
+  }
+
   let duplicate = t => {
     let idMap = Gid.Map.merge(t.tokenData, t.constructorData, (_, _, _) => Some(Gid.create()))
-    let mapUpdate: (Gid.Map.t<'a>, (Gid.t, 'a) => (Gid.t, 'b)) => Gid.Map.t<'b> = (map, f) => {
-      let newMap = ref(Gid.Map.empty())
-      map->Gid.Map.forEach((id, value) => {
-        let (id', value') = f(id, value)
-        newMap := newMap.contents->Gid.Map.set(id', value')
-      })
-      newMap.contents
-    }
     {
       metadata: t.metadata->Metadata.duplicate,
+      space: t.space,
       tokenData: t.tokenData->mapUpdate((id, td) => {
         let newId = idMap->Gid.Map.get(id)->Option.getExn
         (newId, TokenData.duplicate(td))
@@ -50,7 +61,7 @@ module Construction = {
     }
   }
 
-  let rename = (t, name) => {...t, metadata: t.metadata->Metadata.setName(name)}
+  let updateMetadata = (t, f) => {...t, metadata: f(t.metadata)}
   let addToken = (t, id, ~x, ~y) => {
     let tokenData = TokenData.create("tok")
     let node = GraphState.GraphNode.create(id, ~x, ~y, GraphState.GraphNode.Token(tokenData))
@@ -139,12 +150,14 @@ type t = {
   focused: option<Gid.t>,
   order: array<Gid.t>,
   constructions: Gid.Map.t<UndoRedo.t<Construction.t>>,
+  spaces: String.Map.t<CSpace.conSpec>,
 }
 
 let empty = {
   focused: None,
   order: [],
   constructions: Gid.Map.empty(),
+  spaces: String.Map.empty,
 }
 
 let focused = t => t.focused
@@ -153,6 +166,7 @@ let constructions = t =>
     t.constructions->Gid.Map.get(id)->Option.map(c => (id, UndoRedo.state(c)))
   )
 let construction = (t, id) => t.constructions->Gid.Map.get(id)->Option.map(UndoRedo.state)
+let spaces = t => t.spaces
 
 let load = () => None
 let store = t => ()
@@ -160,6 +174,7 @@ let store = t => ()
 let newConstruction = (t, id, name) => {
   let c = Construction.create(name)->UndoRedo.create
   {
+    ...t,
     focused: Some(id),
     order: t.order->Array.concat([id]),
     constructions: t.constructions->Gid.Map.set(id, c),
@@ -175,6 +190,7 @@ let deleteConstruction = (t, id) => {
     }
   )
   {
+    ...t,
     focused: focused,
     order: t.order->Array.filter(id' => id' !== id),
     constructions: t.constructions->Gid.Map.remove(id),
@@ -188,6 +204,7 @@ let duplicateConstruction = (t, ~oldId, ~newId) => {
   ->construction(oldId)
   ->Option.map(Construction.duplicate)
   ->Option.map(construction => {
+    ...t,
     focused: Some(newId),
     order: t.order->Array.flatMap(id' =>
       if id' === oldId {
@@ -206,6 +223,7 @@ let reorderConstructions = (t, order) => {...t, order: order}
 let importConstruction = (t, id, construction) => {
   let c = Construction.duplicate(construction)->UndoRedo.create
   {
+    ...t,
     focused: Some(id),
     order: t.order->Array.concat([id]),
     constructions: t.constructions->Gid.Map.set(id, c),

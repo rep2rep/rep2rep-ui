@@ -3,6 +3,9 @@ module Construction: {
     type t
 
     let name: t => string
+    let notes: t => string
+    let setName: (t, string) => t
+    let setNotes: (t, string) => t
   }
 
   type t
@@ -10,7 +13,7 @@ module Construction: {
   let graph: t => GraphState.t
   let metadata: t => Metadata.t
 
-  let rename: (t, string) => t
+  let updateMetadata: (t, Metadata.t => Metadata.t) => t
   let addToken: (t, Gid.t, ~x: float, ~y: float) => t
   let addConstructor: (t, Gid.t, ~x: float, ~y: float) => t
   let updateToken: (t, Gid.t, TokenData.t => TokenData.t) => t
@@ -30,6 +33,7 @@ let empty: t
 let focused: t => option<Gid.t>
 let constructions: t => array<(Gid.t, Construction.t)>
 let construction: (t, Gid.t) => option<Construction.t>
+let spaces: t => String.Map.t<CSpace.conSpec>
 
 let load: unit => option<t>
 let store: t => unit

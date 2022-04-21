@@ -23,8 +23,19 @@ module Constructor = {
 }
 
 module Construction = {
+  module Metadata = {
+    type t =
+      | Name(string)
+      | Notes(string)
+
+    let dispatch = (metadata, t) =>
+      switch t {
+      | Name(n) => metadata->State.Construction.Metadata.setName(n)
+      | Notes(n) => metadata->State.Construction.Metadata.setNotes(n)
+      }
+  }
+
   type t =
-    | Rename(string)
     | AddToken(Gid.t, float, float)
     | AddConstructor(Gid.t, float, float)
     | DuplicateNode(Gid.t, Gid.t)
@@ -33,12 +44,12 @@ module Construction = {
     | DeleteNode(Gid.t)
     | DeleteLink(Gid.t)
     | ChangeSelection(GraphState.Selection.t)
+    | UpdateMetadata(Metadata.t)
     | UpdateToken(Gid.t, Token.t)
     | UpdateConstructor(Gid.t, Constructor.t)
 
   let dispatch = (construction, t) =>
     switch t {
-    | Rename(name) => construction->State.Construction.rename(name)
     | AddToken(id, x, y) => construction->State.Construction.addToken(id, ~x, ~y)
     | AddConstructor(id, x, y) => construction->State.Construction.addConstructor(id, ~x, ~y)
     | DuplicateNode(oldId, newId) => construction->State.Construction.duplicateNode(~oldId, ~newId)
@@ -48,6 +59,8 @@ module Construction = {
     | DeleteNode(id) => construction->State.Construction.deleteNode(id)
     | DeleteLink(linkId) => construction->State.Construction.deleteLink(linkId)
     | ChangeSelection(selection) => construction->State.Construction.setSelection(selection)
+    | UpdateMetadata(ev) =>
+      construction->State.Construction.updateMetadata(Metadata.dispatch(_, ev))
     | UpdateToken(id, ev) => construction->State.Construction.updateToken(id, Token.dispatch(_, ev))
     | UpdateConstructor(id, ev) =>
       construction->State.Construction.updateConstructor(id, con => con->Constructor.dispatch(ev))
