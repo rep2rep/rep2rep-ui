@@ -79,10 +79,6 @@ module Selector = {
 module AttributesEditor = {
   @react.component
   let make = (~name, ~value, ~onChange) => {
-    let onChange = e => {
-      Js.Console.log(e)
-      onChange(e)
-    }
     let add = _ => value->List.concat(List.singleton(""))->onChange
     let edit = (e, i) =>
       value
@@ -190,6 +186,28 @@ module Constructor = {
   }
 }
 
+module Edge = {
+  @react.component
+  let make = (~data: EdgeData.t, ~onChange) => {
+    <>
+      <Row>
+        <Label> {React.string("Label")} </Label>
+        <input
+          type_="number"
+          value={EdgeData.payload(data)->Option.map(Int.toString)->Option.getWithDefault("")}
+          onChange={e =>
+            ReactEvent.Form.target(e)["value"]->Int.fromString->Event.Edge.Value->onChange}
+        />
+      </Row>
+      <Notes
+        name="edge-notes"
+        value={EdgeData.notes(data)}
+        onChange={e => ReactEvent.Form.target(e)["value"]->Event.Edge.Notes->onChange}
+      />
+    </>
+  }
+}
+
 module Construction = {
   @react.component
   let make = (~data: State.Construction.t, ~spaces, ~onChange) => {
@@ -234,6 +252,7 @@ module Data = {
     | Nothing
     | Token(TokenData.t, Gid.t)
     | Constructor(ConstructorData.t, String.Map.t<CSpace.constructor>, Gid.t)
+    | Edge(EdgeData.t, Gid.t)
     | Construction(State.Construction.t, String.Map.t<CSpace.conSpec>, Gid.t)
     | Multiple
 }
@@ -298,6 +317,8 @@ let make = (~id, ~data, ~nodeIds, ~onChange=?) => {
       <Constructor
         data constructors onChange={e => Event.Construction.UpdateConstructor(nodeId, e)->onChange}
       />
+    | Data.Edge(data, linkId) =>
+      <Edge data onChange={e => Event.Construction.UpdateEdge(linkId, e)->onChange} />
     | Data.Multiple =>
       <span
         style={ReactDOM.Style.make(

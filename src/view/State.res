@@ -19,6 +19,7 @@ module Construction = {
     space: option<CSpace.conSpec>,
     tokenData: Gid.Map.t<TokenData.t>,
     constructorData: Gid.Map.t<ConstructorData.t>,
+    edgeData: Gid.Map.t<EdgeData.t>,
     graph: GraphState.t,
   }
 
@@ -31,6 +32,7 @@ module Construction = {
     space: None,
     tokenData: Gid.Map.empty(),
     constructorData: Gid.Map.empty(),
+    edgeData: Gid.Map.empty(),
     graph: GraphState.empty,
   }
 
@@ -57,6 +59,15 @@ module Construction = {
       constructorData: t.constructorData->mapUpdate((id, cd) => {
         let newId = idMap->Gid.Map.get(id)->Option.getExn
         (newId, ConstructorData.duplicate(cd))
+      }),
+      edgeData: t.edgeData->mapUpdate((id, ed) => {
+        let newId = idMap->Gid.Map.get(id)->Option.getExn
+        let newSource = idMap->Gid.Map.get(EdgeData.source(ed))->Option.getExn
+        let newTarget = idMap->Gid.Map.get(EdgeData.target(ed))->Option.getExn
+        (
+          newId,
+          ed->EdgeData.duplicate->EdgeData.setSource(newSource)->EdgeData.setTarget(newTarget),
+        )
       }),
       graph: t.graph->GraphState.duplicate(idMap),
     }
@@ -100,6 +111,7 @@ module Construction = {
     })
     ->Option.getWithDefault(t)
   }
+
   let updateConstructor = (t, id, f) => {
     t.constructorData
     ->Gid.Map.get(id)
@@ -114,6 +126,19 @@ module Construction = {
     })
     ->Option.getWithDefault(t)
   }
+
+  let updateEdge = (t, id, f) => {
+    t.edgeData
+    ->Gid.Map.get(id)
+    ->Option.map(f)
+    ->Option.map(newData => {
+      ...t,
+      edgeData: t.edgeData->Gid.Map.set(id, newData),
+      graph: t.graph->GraphState.updateLink(id, GraphState.GraphLink.setData(_, newData)),
+    })
+    ->Option.getWithDefault(t)
+  }
+
   let moveNode = (t, id, ~x, ~y) => {
     ...t,
     graph: t.graph->GraphState.updateNode(id, GraphState.GraphNode.move(_, ~x, ~y)),
@@ -122,8 +147,13 @@ module Construction = {
     t
   }
   let connect = (t, ~linkId, ~source, ~target) => {
-    let link = GraphState.GraphLink.create(linkId, ~source, ~target)
-    {...t, graph: t.graph->GraphState.addLink(link)}
+    let edgeData = EdgeData.create(source, target, None)
+    let link = GraphState.GraphLink.create(linkId, ~source, ~target, ~edgeData)
+    {
+      ...t,
+      edgeData: t.edgeData->Gid.Map.set(linkId, edgeData),
+      graph: t.graph->GraphState.addLink(link),
+    }
   }
   let deleteNode = (t, id) => {
     ...t,
@@ -133,6 +163,7 @@ module Construction = {
   }
   let deleteLink = (t, link) => {
     ...t,
+    edgeData: t.edgeData->Gid.Map.remove(link),
     graph: t.graph->GraphState.deleteLink(link),
   }
   let setSelection = (t, selection) => {...t, graph: t.graph->GraphState.setSelection(selection)}
@@ -145,6 +176,8 @@ module Construction = {
     } else {
       None
     }
+
+  let getLink = (t, id) => t.edgeData->Gid.Map.get(id)
 }
 
 type t = {

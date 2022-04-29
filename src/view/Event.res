@@ -22,6 +22,18 @@ module Constructor = {
     }
 }
 
+module Edge = {
+  type t =
+    | Value(option<int>)
+    | Notes(string)
+
+  let dispatch = (edge, t) =>
+    switch t {
+    | Value(v) => edge->EdgeData.setPayload(v)
+    | Notes(n) => edge->EdgeData.setNotes(n)
+    }
+}
+
 module Construction = {
   module Metadata = {
     type t =
@@ -48,6 +60,7 @@ module Construction = {
     | UpdateMetadata(Metadata.t)
     | UpdateToken(Gid.t, Token.t)
     | UpdateConstructor(Gid.t, Constructor.t)
+    | UpdateEdge(Gid.t, Edge.t)
 
   let dispatch = (construction, t) =>
     switch t {
@@ -66,6 +79,8 @@ module Construction = {
     | UpdateToken(id, ev) => construction->State.Construction.updateToken(id, Token.dispatch(_, ev))
     | UpdateConstructor(id, ev) =>
       construction->State.Construction.updateConstructor(id, con => con->Constructor.dispatch(ev))
+    | UpdateEdge(id, ev) =>
+      construction->State.Construction.updateEdge(id, ed => ed->Edge.dispatch(ev))
     }
 }
 

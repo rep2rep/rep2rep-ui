@@ -14,8 +14,9 @@ module GraphNode: {
 module GraphLink: {
   type t
 
-  let create: (Gid.t, ~source: Gid.t, ~target: Gid.t) => t
-  let data: t => array<ReactD3Graph.Link.t<int>>
+  let create: (Gid.t, ~source: Gid.t, ~target: Gid.t, ~edgeData: EdgeData.t) => t
+  let data: t => array<ReactD3Graph.Link.t<unit>>
+  let setData: (t, EdgeData.t) => t
 }
 
 module Selection: {
@@ -32,12 +33,13 @@ type t
 
 let duplicate: (t, Gid.Map.t<Gid.t>) => t
 let empty: t
-let data: t => ReactD3Graph.Data.t<[#token | #constructor], int>
+let data: t => ReactD3Graph.Data.t<[#token | #constructor], unit>
 let selection: t => Selection.t
 
 let addNode: (t, GraphNode.t) => t
 let addLink: (t, GraphLink.t) => t
 let updateNode: (t, Gid.t, GraphNode.t => GraphNode.t) => t
+let updateLink: (t, Gid.t, GraphLink.t => GraphLink.t) => t
 let deleteNode: (t, Gid.t) => t
 let deleteLink: (t, Gid.t) => t
 let setSelection: (t, Selection.t) => t

@@ -103,9 +103,9 @@ module GraphNode = {
 }
 
 module GraphLink = {
-  type t = ReactD3Graph.Link.t<int>
+  type t = ReactD3Graph.Link.t<unit>
 
-  let makeConfig = () => {
+  let makeConfig = edgeData => {
     let offset = (src, tgt, _) =>
       (src, tgt)
       ->Option.both
@@ -149,17 +149,28 @@ module GraphLink = {
       ~offsetTarget={
         (src, tgt, breakPoints) => offset(tgt, src, breakPoints)
       },
+      ~labelProperty=_ =>
+        edgeData
+        ->EdgeData.payload
+        ->Option.map(Int.toString)
+        ->Option.getWithDefault("")
+        ->(
+          e => {
+            Js.Console.log(e)
+            e
+          }
+        ),
       (),
     )
   }
 
-  let create = (id, ~source, ~target) =>
+  let create = (id, ~source, ~target, ~edgeData) =>
     ReactD3Graph.Link.create(
       ~source=fromGid(source),
       ~target=fromGid(target),
       ~id=Gid.toString(id)->ReactD3Graph.Link.Id.ofString,
-      ~payload=0,
-      ~config=makeConfig(),
+      ~payload=(),
+      ~config=makeConfig(edgeData),
       (),
     )
 
@@ -172,6 +183,11 @@ module GraphLink = {
     t
     ->ReactD3Graph.Link.setSource(newSource->fromGid)
     ->ReactD3Graph.Link.setTarget(newTarget->fromGid)
+  let setData = (t, newPayload) => {
+    let config = makeConfig(newPayload)
+    Js.Console.log(config)
+    ReactD3Graph.Link.updateConfig(t, _ => config)
+  }
 }
 
 module Selection = {
@@ -232,6 +248,7 @@ let data = t => {
 let selection = t => t.selection
 let addNode = (t, node) => {...t, nodes: t.nodes->Array.concat([node])}
 let addLink = (t, link) => {...t, links: t.links->Array.concat([link])}
+
 let updateNode = (t, nodeId, f) => {
   ...t,
   nodes: t.nodes->Array.map(node =>
@@ -242,14 +259,28 @@ let updateNode = (t, nodeId, f) => {
     }
   ),
 }
+
+let updateLink = (t, linkId, f) => {
+  ...t,
+  links: t.links->Array.map(link =>
+    if GraphLink.id(link) === linkId {
+      f(link)
+    } else {
+      link
+    }
+  ),
+}
+
 let deleteNode = (t, nodeId) => {
   ...t,
   nodes: t.nodes->Array.filter(node => GraphNode.id(node) !== nodeId),
 }
+
 let deleteLink = (t, linkId) => {
   ...t,
   links: t.links->Array.filter(link => GraphLink.id(link) !== linkId),
 }
+
 let setSelection = (t, selection) => {...t, selection: selection}
 
 let incidentLinks = (t, ~nodeId) => {

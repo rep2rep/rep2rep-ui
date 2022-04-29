@@ -30,8 +30,6 @@ module App = {
     ~link=ReactD3Graph.Link.Config.create(
       ~color=ReactD3Graph.Color.ofHexString("#000000"),
       ~renderLabel=true,
-      ~labelProperty=link =>
-        link->ReactD3Graph.Link.payload->Option.map(Int.toString)->Option.getWithDefault(""),
       ~fontSize=10.0,
       ~fontScaling=false,
       ~curveType=ReactD3Graph.Link.CurveType.catmullRom,
@@ -281,8 +279,11 @@ module App = {
               state
               ->State.construction(focused)
               ->Option.flatMap(construction =>
-                switch GraphState.Selection.nodes(selection) {
-                | [node] =>
+                switch (
+                  GraphState.Selection.nodes(selection),
+                  GraphState.Selection.links(selection),
+                ) {
+                | ([node], []) =>
                   switch construction->State.Construction.getNode(node) {
                   | Some(#token(data)) => Inspector.Data.Token(data, node)->Some
                   | Some(#constructor(data)) =>
@@ -301,7 +302,11 @@ module App = {
                     )->Some
                   | _ => None
                   }
-                | [] =>
+                | ([], [link]) =>
+                  construction
+                  ->State.Construction.getLink(link)
+                  ->Option.map(data => Inspector.Data.Edge(data, link))
+                | ([], []) =>
                   Inspector.Data.Construction(construction, State.spaces(state), focused)->Some
                 | _ => Inspector.Data.Multiple->Some
                 }
