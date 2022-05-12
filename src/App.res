@@ -1,12 +1,6 @@
 module BoolStore = LocalStorage.MakeJsonable(Bool)
 
 module App = {
-  // let forAaron: unit => Rpc.Response.t<Constructions.construction> = Rpc_service.require(
-  //   "aarons.forAaron",
-  //   Rpc.Datatype.unit_,
-  //   Constructions.construction_rpc,
-  // )
-
   let init = State.load()->Option.getWithDefault(State.empty)
   let reducer = (state, action) => {
     let newState = Event.dispatch(state, action)
@@ -42,20 +36,6 @@ module App = {
 
   @react.component
   let make = () => {
-    // forAaron()->Rpc.Response.upon(construction => {
-    //   Js.Console.log(construction)
-
-    //   construction->Constructions.size->Rpc.Response.upon(size => Js.Console.log({"size": size}))
-
-    //   construction
-    //   ->Constructions.leavesOfConstruction
-    //   ->Rpc.Response.upon(leaves => Js.Console.log({"leaves": leaves}))
-
-    //   construction
-    //   ->Constructions.fullTokenSequence
-    //   ->Rpc.Response.upon(seq => Js.Console.log({"full token sequence": seq}))
-    // })
-
     let (state, dispatch) = React.useReducer(reducer, init)
 
     React.useEffect0(() => {

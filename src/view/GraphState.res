@@ -150,16 +150,7 @@ module GraphLink = {
         (src, tgt, breakPoints) => offset(tgt, src, breakPoints)
       },
       ~labelProperty=_ =>
-        edgeData
-        ->EdgeData.payload
-        ->Option.map(Int.toString)
-        ->Option.getWithDefault("")
-        ->(
-          e => {
-            Js.Console.log(e)
-            e
-          }
-        ),
+        edgeData->EdgeData.payload->Option.map(Int.toString)->Option.getWithDefault(""),
       (),
     )
   }
@@ -185,7 +176,6 @@ module GraphLink = {
     ->ReactD3Graph.Link.setTarget(newTarget->fromGid)
   let setData = (t, newPayload) => {
     let config = makeConfig(newPayload)
-    Js.Console.log(config)
     ReactD3Graph.Link.updateConfig(t, _ => config)
   }
 }
