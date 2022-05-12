@@ -6,3 +6,11 @@ let name: typ => string
 
 let any: typ
 let equal: (typ, typ) => bool
+
+module PrincipalType: {
+  type t
+  let t_rpc: Rpc.Datatype.t<t>
+
+  let type_: t => typ
+  let isSubTypeable: t => bool
+}

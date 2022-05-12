@@ -144,7 +144,9 @@ module Notes = {
 
 module Token = {
   @react.component
-  let make = (~data: TokenData.t, ~onChange) => {
+  let make = (~data: TokenData.t, ~principalTypes, ~onChange) => {
+    let prinType =
+      data.type_->Option.map(Type.name)->Option.flatMap(t => principalTypes->String.Map.get(t))
     <>
       <Row>
         <Label> {React.string("Label")} </Label>
@@ -153,6 +155,28 @@ module Token = {
           onChange={e => ReactEvent.Form.target(e)["value"]->Event.Token.Label->onChange}
         />
       </Row>
+      <Row>
+        <Label> {React.string("Type")} </Label>
+        <Selector
+          name="token-type-selector"
+          current={prinType}
+          options={String.Map.valuesToArray(principalTypes)}
+          toString={p => p->Type.PrincipalType.type_->Type.name}
+          fromString={s => principalTypes->String.Map.get(s)}
+          onChange={e => Event.Token.Type(e->Option.map(Type.PrincipalType.type_))->onChange}
+        />
+      </Row>
+      {if prinType->Option.map(Type.PrincipalType.isSubTypeable)->Option.getWithDefault(false) {
+        <Row>
+          <Label> {React.string("SubType")} </Label>
+          <Input
+            value={data.subtype->Option.getWithDefault("")}
+            onChange={e => ReactEvent.Form.target(e)["value"]->Event.Token.Subtype->onChange}
+          />
+        </Row>
+      } else {
+        React.null
+      }}
       <Notes
         name="token-notes"
         value={data.notes}
@@ -229,7 +253,7 @@ module Construction = {
           name="space-selector"
           options={String.Map.valuesToArray(spaces)}
           current={data->State.Construction.space}
-          toString={space => space.CSpace.name}
+          toString={space => space->CSpace.conSpecName}
           fromString={spaceName => spaces->String.Map.get(spaceName)}
           onChange={e => Event.Construction.SetSpace(e)->onChange}
         />
@@ -250,7 +274,7 @@ module Construction = {
 module Data = {
   type t =
     | Nothing
-    | Token(TokenData.t, Gid.t)
+    | Token(TokenData.t, String.Map.t<Type.PrincipalType.t>, Gid.t)
     | Constructor(ConstructorData.t, String.Map.t<CSpace.constructor>, Gid.t)
     | Edge(EdgeData.t, Gid.t)
     | Construction(State.Construction.t, String.Map.t<CSpace.conSpec>, Gid.t)
@@ -311,8 +335,10 @@ let make = (~id, ~data, ~nodeIds, ~onChange=?) => {
         {React.string("Select a structure graph")}
       </span>
     | Data.Construction(data, spaces, constructionId) => <Construction data spaces onChange />
-    | Data.Token(data, nodeId) =>
-      <Token data onChange={e => Event.Construction.UpdateToken(nodeId, e)->onChange} />
+    | Data.Token(data, principalTypes, nodeId) =>
+      <Token
+        data principalTypes onChange={e => Event.Construction.UpdateToken(nodeId, e)->onChange}
+      />
     | Data.Constructor(data, constructors, nodeId) =>
       <Constructor
         data constructors onChange={e => Event.Construction.UpdateConstructor(nodeId, e)->onChange}

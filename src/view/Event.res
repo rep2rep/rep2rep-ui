@@ -1,11 +1,15 @@
 module Token = {
   type t =
     | Label(string)
+    | Type(option<Type.typ>)
+    | Subtype(option<string>)
     | Notes(string)
 
   let dispatch = (token, t) =>
     switch t {
     | Label(l) => {...token, TokenData.label: l}
+    | Type(t) => {...token, TokenData.type_: t}
+    | Subtype(s) => {...token, subtype: s}
     | Notes(n) => {...token, TokenData.notes: n}
     }
 }

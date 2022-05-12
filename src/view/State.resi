@@ -38,7 +38,10 @@ let focused: t => option<Gid.t>
 let constructions: t => array<(Gid.t, Construction.t)>
 let construction: (t, Gid.t) => option<Construction.t>
 let spaces: t => String.Map.t<CSpace.conSpec>
+let typeSystems: t => String.Map.t<FiniteSet.t<Type.PrincipalType.t>>
+
 let loadSpaces: t => Rpc.Response.t<t>
+let loadTypeSystems: t => Rpc.Response.t<t>
 
 let load: unit => option<t>
 let store: t => unit

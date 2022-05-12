@@ -185,6 +185,7 @@ type t = {
   order: array<Gid.t>,
   constructions: Gid.Map.t<UndoRedo.t<Construction.t>>,
   spaces: String.Map.t<CSpace.conSpec>,
+  typeSystems: String.Map.t<FiniteSet.t<Type.PrincipalType.t>>,
 }
 
 let empty = {
@@ -192,6 +193,7 @@ let empty = {
   order: [],
   constructions: Gid.Map.empty(),
   spaces: String.Map.empty,
+  typeSystems: String.Map.empty,
 }
 
 let focused = t => t.focused
@@ -201,15 +203,32 @@ let constructions = t =>
   )
 let construction = (t, id) => t.constructions->Gid.Map.get(id)->Option.map(UndoRedo.state)
 let spaces = t => t.spaces
+let typeSystems = t => t.typeSystems
+
 let getAvailableSpaces: unit => Rpc.Response.t<array<CSpace.conSpec>> = Rpc_service.require(
-  "aarons.demoSpaces",
+  "server.spaces",
   Rpc.Datatype.unit_,
   Array.t_rpc(CSpace.conSpec_rpc),
 )
 let loadSpaces = t =>
-  getAvailableSpaces()->Rpc.Response.map(spaces => {
+  getAvailableSpaces()
+  ->Rpc.Response.map(spaces => spaces->Array.map(space => (CSpace.conSpecName(space), space)))
+  ->Rpc.Response.map(spaces => {
     ...t,
-    spaces: spaces->Array.map(space => (space.name, space))->String.Map.fromArray,
+    spaces: spaces->String.Map.fromArray,
+  })
+
+let getAvailableTypeSystems: unit => Rpc.Response.t<
+  array<(string, FiniteSet.t<Type.PrincipalType.t>)>,
+> = Rpc_service.require(
+  "server.typeSystems",
+  Rpc.Datatype.unit_,
+  Array.t_rpc(Rpc.Datatype.tuple2_(String.t_rpc, FiniteSet.t_rpc(Type.PrincipalType.t_rpc))),
+)
+let loadTypeSystems = t =>
+  getAvailableTypeSystems()->Rpc.Response.map(systems => {
+    ...t,
+    typeSystems: systems->String.Map.fromArray,
   })
 
 let load = () => None

@@ -33,15 +33,9 @@ let conSpec_rpc = Rpc.Datatype.tuple3_(
   ({name, typeSystem, constructors}) => (name, typeSystem, constructors),
 )
 
-let makeCTyp = (ts, t) => (ts, t)
-let makeConstructor = (s, t) => (s, t)
-let makeToken = (s, t) => (s, t)
-let makeConfigurator = (s, c) => (s, c)
-let makeConSpec = (~name, ~typeSystem, ~constructors) => {
-  name: name,
-  typeSystem: typeSystem,
-  constructors: constructors,
-}
-
 let constructorName = ((name, _)) => name
 let constructorSignature = ((_, sig)) => sig
+
+let conSpecName = t => t.name
+let conSpecTypeSystem = t => t.typeSystem
+let conSpecConstructors = t => t.constructors

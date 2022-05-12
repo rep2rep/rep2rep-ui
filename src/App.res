@@ -41,6 +41,7 @@ module App = {
     React.useEffect0(() => {
       state
       ->State.loadSpaces
+      ->Rpc.Response.flatMap(State.loadTypeSystems)
       ->Rpc.Response.upon(state => {
         Js.Console.log(state)
         dispatch(Event.Update(state))
@@ -265,14 +266,34 @@ module App = {
                 ) {
                 | ([node], []) =>
                   switch construction->State.Construction.getNode(node) {
-                  | Some(#token(data)) => Inspector.Data.Token(data, node)->Some
+                  | Some(#token(data)) =>
+                    Inspector.Data.Token(
+                      data,
+                      construction
+                      ->State.Construction.space
+                      ->Option.flatMap(space => {
+                        let typeSystemName = CSpace.conSpecTypeSystem(space)
+                        state
+                        ->State.typeSystems
+                        ->String.Map.get(typeSystemName)
+                        ->Option.map(pts =>
+                          pts
+                          ->FiniteSet.toArray
+                          ->Array.map(p => (p->Type.PrincipalType.type_->Type.name, p))
+                          ->String.Map.fromArray
+                        )
+                      })
+                      ->Option.getWithDefault(String.Map.empty),
+                      node,
+                    )->Some
                   | Some(#constructor(data)) =>
                     Inspector.Data.Constructor(
                       data,
                       construction
                       ->State.Construction.space
                       ->Option.map(space =>
-                        space.constructors
+                        space
+                        ->CSpace.conSpecConstructors
                         ->FiniteSet.toArray
                         ->Array.map(c => (CSpace.constructorName(c), c))
                         ->String.Map.fromArray
