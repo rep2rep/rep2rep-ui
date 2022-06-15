@@ -14,7 +14,7 @@ module App = {
       ~height="calc(100vh - 40px)",
       ~defs=[
         <marker id="arrowhead" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
-          <path d="M1 1 L7 4 L1 7" fill="none" strokeWidth="1" stroke="#000000" />
+          <path d="M1 1 L7 4 L1 7" fill="black" strokeWidth="1" stroke="#000000" />
         </marker>,
       ],
       (),
