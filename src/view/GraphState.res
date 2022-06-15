@@ -150,7 +150,16 @@ module GraphLink = {
         (src, tgt, breakPoints) => offset(tgt, src, breakPoints)
       },
       ~labelProperty=_ =>
-        edgeData->EdgeData.payload->Option.map(Int.toString)->Option.getWithDefault(""),
+        edgeData
+        ->EdgeData.payload
+        ->Option.map(Int.toString)
+        ->Option.map(label => {
+          <g>
+            <circle r="8" cx="8" cy="8" fill="white" />
+            <text textAnchor="middle" x="8" y="12" fontSize="0.8rem"> {React.string(label)} </text>
+          </g>
+        })
+        ->Option.getWithDefault(React.null),
       (),
     )
   }
