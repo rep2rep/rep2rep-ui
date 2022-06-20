@@ -88,7 +88,25 @@ module App = {
     let connectNodes = _ =>
       switch GraphState.Selection.nodes(selection) {
       | [self] => dispatchC(Event.Construction.ConnectNodes(Gid.create(), self, self))
-      | [source, target] => dispatchC(Event.Construction.ConnectNodes(Gid.create(), source, target))
+      | [source, target] =>
+        focused
+        ->Option.flatMap(State.construction(state, _))
+        ->Option.iter(construction => {
+          let kind = vert =>
+            construction
+            ->State.Construction.getNode(vert)
+            ->Option.map(v =>
+              switch v {
+              | #token(_) => #token
+              | #constructor(_) => #constructor
+              }
+            )
+          let s = kind(source)
+          let t = kind(target)
+          if Option.isSome(s) && Option.isSome(t) && Option.getExn(s) !== Option.getExn(t) {
+            dispatchC(Event.Construction.ConnectNodes(Gid.create(), source, target))
+          }
+        })
       | _ => ()
       }
     let deleteSelection = _ => {
