@@ -14,6 +14,8 @@ module Construction: {
   let metadata: t => Metadata.t
   let space: t => option<CSpace.conSpec>
 
+  let isEmpty: t => bool
+
   let updateMetadata: (t, Metadata.t => Metadata.t) => t
   let setSpace: (t, option<CSpace.conSpec>) => t
   let addToken: (t, Gid.t, ~x: float, ~y: float) => t

@@ -36,6 +36,11 @@ module Construction = {
     graph: GraphState.empty,
   }
 
+  let isEmpty = t =>
+    t.tokenData->Gid.Map.size === 0 &&
+    t.constructorData->Gid.Map.size === 0 &&
+    t.edgeData->Gid.Map.size === 0
+
   let setSpace = (t, space) => {...t, space: space}
 
   let mapUpdate = (map, f) => {

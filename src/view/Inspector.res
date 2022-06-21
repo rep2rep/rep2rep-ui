@@ -59,11 +59,13 @@ module Selector = {
     ~toString: 'a => string,
     ~fromString: string => option<'a>,
     ~onChange: option<'a> => unit,
+    ~enabled: bool=true,
   ) => {
     <select
       name
       value={current->Option.map(toString)->Option.getWithDefault("-")}
-      onChange={e => onChange(fromString(ReactEvent.Form.target(e)["value"]))}>
+      onChange={e => onChange(fromString(ReactEvent.Form.target(e)["value"]))}
+      disabled={!enabled}>
       <option value="-" key={name ++ "-option-none"}> {React.string("-")} </option>
       {options
       ->Array.map(a =>
@@ -234,7 +236,7 @@ module Edge = {
 
 module Construction = {
   @react.component
-  let make = (~data: State.Construction.t, ~spaces, ~onChange) => {
+  let make = (~data: State.Construction.t, ~onChange) => {
     <>
       <Row>
         <Label> {React.string("Name")} </Label>
@@ -245,17 +247,6 @@ module Construction = {
             ->Event.Construction.Metadata.Name
             ->Event.Construction.UpdateMetadata
             ->onChange}
-        />
-      </Row>
-      <Row>
-        <Label> {React.string("Space")} </Label>
-        <Selector
-          name="space-selector"
-          options={String.Map.valuesToArray(spaces)}
-          current={data->State.Construction.space}
-          toString={space => space->CSpace.conSpecName}
-          fromString={spaceName => spaces->String.Map.get(spaceName)}
-          onChange={e => Event.Construction.SetSpace(e)->onChange}
         />
       </Row>
       <Notes
@@ -277,7 +268,7 @@ module Data = {
     | Token(TokenData.t, String.Map.t<Type.PrincipalType.t>, Gid.t)
     | Constructor(ConstructorData.t, String.Map.t<CSpace.constructor>, Gid.t)
     | Edge(EdgeData.t, Gid.t)
-    | Construction(State.Construction.t, String.Map.t<CSpace.conSpec>, Gid.t)
+    | Construction(State.Construction.t, Gid.t)
     | Multiple
 }
 
@@ -334,7 +325,7 @@ let make = (~id, ~data, ~nodeIds, ~onChange=?) => {
         className="inspector-panel-empty-message">
         {React.string("Select a structure graph")}
       </span>
-    | Data.Construction(data, spaces, constructionId) => <Construction data spaces onChange />
+    | Data.Construction(data, constructionId) => <Construction data onChange />
     | Data.Token(data, principalTypes, nodeId) =>
       <Token
         data principalTypes onChange={e => Event.Construction.UpdateToken(nodeId, e)->onChange}

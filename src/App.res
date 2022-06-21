@@ -222,6 +222,24 @@ module App = {
           <Button onClick={undo} value="Undo" enabled={canUndo} tooltip="Cmd+Z" />
           <Button onClick={redo} value="Redo" enabled={canRedo} tooltip="Cmd+Shift+Z" />
           <Button.Separator />
+          <label htmlFor="space-selector" style={ReactDOM.Style.make(~marginRight="0.25rem", ())}>
+            {React.string("Space ")}
+          </label>
+          <Inspector.Selector
+            name="space-selector"
+            options={String.Map.valuesToArray(State.spaces(state))}
+            current={focused
+            ->Option.flatMap(state->State.construction(_))
+            ->Option.flatMap(State.Construction.space)}
+            toString={space => space->CSpace.conSpecName}
+            fromString={spaceName => state->State.spaces->String.Map.get(spaceName)}
+            onChange={e => Event.Construction.SetSpace(e)->dispatchC}
+            enabled={focused
+            ->Option.flatMap(state->State.construction(_))
+            ->Option.map(State.Construction.isEmpty)
+            ->Option.getWithDefault(true) && toolbarActive}
+          />
+          <Button.Separator />
           <Button
             onClick={addTokenNodeAt(_, ~x=0., ~y=0.)}
             value="Token"
@@ -334,8 +352,7 @@ module App = {
                   construction
                   ->State.Construction.getLink(link)
                   ->Option.map(data => Inspector.Data.Edge(data, link))
-                | ([], []) =>
-                  Inspector.Data.Construction(construction, State.spaces(state), focused)->Some
+                | ([], []) => Inspector.Data.Construction(construction, focused)->Some
                 | _ => Inspector.Data.Multiple->Some
                 }
               )
