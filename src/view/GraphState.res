@@ -106,48 +106,81 @@ module GraphLink = {
   type t = ReactD3Graph.Link.t<unit>
 
   let makeConfig = edgeData => {
-    let offset = (src, tgt, _) =>
+    let offsets = (src, tgt, _) =>
       (src, tgt)
       ->Option.both
       ->Option.map(((src, tgt)) => {
-        let (x1, y1) = (src["x"], src["y"])
-        let (x2, y2) = (tgt["x"], tgt["y"])
-        let size = src->ReactD3Graph.Core.readKeyExn("size")
+        let p_src = src->ReactD3Graph.Core.readKeyExn("payload")
+        let p_tgt = tgt->ReactD3Graph.Core.readKeyExn("payload")
+        let ssize = src->ReactD3Graph.Core.readKeyExn("size")
         let tsize = tgt->ReactD3Graph.Core.readKeyExn("size")
-        switch src->ReactD3Graph.Core.readKeyExn("payload") {
-        | #constructor => {
-            let (x, y) = (x2 -. x1, y2 -. y1)
-            let l = Js.Math.hypot(x, y)
-            let (dx, dy) = (x /. l, y /. l)
-            {
-              "dx": 6. *. dx -. size["width"] /. 20. +. 6.,
-              "dy": 6. *. dy -. size["height"] /. 20. +. 6.,
-            }
+        let (x1, y1) = switch p_src {
+        | #token => (src["x"], src["y"])
+        | #constructor => (
+            src["x"] -. ssize["width"] /. 20. +. 6.,
+            src["y"] -. ssize["height"] /. 20. +. 6.,
+          )
+        }
+        let (x2, y2) = switch p_tgt {
+        | #token => (tgt["x"], tgt["y"])
+        | #constructor => (
+            tgt["x"] -. tsize["width"] /. 20. +. 6.,
+            tgt["y"] -. tsize["height"] /. 20. +. 6.,
+          )
+        }
+        let cons = (~isSource) => {
+          let (x, y) = if isSource {
+            (x2 -. x1, y2 -. y1)
+          } else {
+            (x1 -. x2, y1 -. y2)
           }
-        | #token => {
-            let (x2, y2) = (x2 -. size["width"] /. 20. +. 6., y2 -. size["height"] /. 20. +. 6.)
-            let (dx0, dy0) = (x2 -. x1, y2 -. y1)
-            let (dx, dy) = if Js.Math.abs_float(dx0 /. dy0) > size["width"] /. size["height"] {
-              let dx = size["width"] /. 20. *. Js.Math.sign_float(dx0)
-              let dy = dy0 *. dx /. dx0
-              (dx, dy)
-            } else {
-              let dy = size["height"] /. 20. *. Js.Math.sign_float(dy0)
-              let dx = dx0 *. dy /. dy0
-              (dx, dy)
-            }
-            {"dx": dx, "dy": dy}
+          let size = if isSource {
+            ssize
+          } else {
+            tsize
+          }
+          let l = Js.Math.hypot(x, y)
+          let (dx, dy) = (x /. l, y /. l)
+          {
+            "dx": 6. *. dx -. size["width"] /. 20. +. 6.,
+            "dy": 6. *. dy -. size["height"] /. 20. +. 6.,
           }
         }
+        let tok = (~isSource) => {
+          let size = if isSource {
+            ssize
+          } else {
+            tsize
+          }
+          let (dx0, dy0) = if isSource {
+            (x2 -. x1, y2 -. y1)
+          } else {
+            (x1 -. x2, y1 -. y2)
+          }
+          let (dx, dy) = if Js.Math.abs_float(dx0 /. dy0) > size["width"] /. size["height"] {
+            let dx = size["width"] /. 20. *. Js.Math.sign_float(dx0)
+            let dy = dy0 *. dx /. dx0
+            (dx, dy)
+          } else {
+            let dy = size["height"] /. 20. *. Js.Math.sign_float(dy0)
+            let dx = dx0 *. dy /. dy0
+            (dx, dy)
+          }
+          {"dx": dx, "dy": dy}
+        }
+        switch p_src {
+        | #constructor => (cons(~isSource=true), tok(~isSource=false))
+        | #token => (tok(~isSource=true), cons(~isSource=false))
+        }
       })
-      ->Option.getWithDefault({"dx": 0.0, "dy": 0.0})
+      ->Option.getWithDefault(({"dx": 0.0, "dy": 0.0}, {"dx": 0.0, "dy": 0.0}))
 
     ReactD3Graph.Link.Config.create(
       ~offsetSource={
-        (src, tgt, breakPoints) => offset(src, tgt, breakPoints)
+        (src, tgt, breakPoints) => offsets(src, tgt, breakPoints)->fst
       },
       ~offsetTarget={
-        (src, tgt, breakPoints) => offset(tgt, src, breakPoints)
+        (src, tgt, breakPoints) => offsets(src, tgt, breakPoints)->snd
       },
       ~labelProperty=_ =>
         edgeData
