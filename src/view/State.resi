@@ -35,7 +35,7 @@ type t
 
 let empty: t
 let focused: t => option<Gid.t>
-let constructions: t => array<(Gid.t, Construction.t)>
+let constructions: t => FileTree.t<(Gid.t, Construction.t)>
 let construction: (t, Gid.t) => option<Construction.t>
 let spaces: t => String.Map.t<CSpace.conSpec>
 let typeSystems: t => String.Map.t<FiniteSet.t<Type.PrincipalType.t>>
@@ -46,13 +46,18 @@ let loadTypeSystems: t => Rpc.Response.t<t>
 let load: unit => option<t>
 let store: t => unit
 
-let newConstruction: (t, Gid.t, string) => t
+let newConstruction: (t, Gid.t, string, FileTree.Path.t) => t
 let deleteConstruction: (t, Gid.t) => t
 let focusConstruction: (t, option<Gid.t>) => t
 let duplicateConstruction: (t, ~oldId: Gid.t, ~newId: Gid.t) => t
-let reorderConstructions: (t, array<Gid.t>) => t
-let importConstruction: (t, Gid.t, Construction.t) => t
+let reorderConstructions: (t, FileTree.t<Gid.t>) => t
+let importConstruction: (t, Gid.t, Construction.t, FileTree.Path.t) => t
 let updateConstruction: (t, Gid.t, Construction.t => Construction.t) => t
+let updateConstructionBypassingUndoRedo: (t, Gid.t, Construction.t => Construction.t) => t
+
+let newFolder: (t, Gid.t, string, FileTree.Path.t) => t
+let renameFolder: (t, Gid.t, string) => t
+let deleteFolder: (t, Gid.t) => t
 
 let undo: (t, Gid.t) => t
 let redo: (t, Gid.t) => t

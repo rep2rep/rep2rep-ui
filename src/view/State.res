@@ -182,7 +182,7 @@ module Construction = {
 
 type t = {
   focused: option<Gid.t>,
-  order: array<Gid.t>,
+  order: FileTree.t<Gid.t>,
   constructions: Gid.Map.t<UndoRedo.t<Construction.t>>,
   spaces: String.Map.t<CSpace.conSpec>,
   typeSystems: String.Map.t<FiniteSet.t<Type.PrincipalType.t>>,
@@ -190,7 +190,7 @@ type t = {
 
 let empty = {
   focused: None,
-  order: [],
+  order: FileTree.empty(),
   constructions: Gid.Map.empty(),
   spaces: String.Map.empty,
   typeSystems: String.Map.empty,
@@ -198,8 +198,8 @@ let empty = {
 
 let focused = t => t.focused
 let constructions = t =>
-  t.order->Array.keepMap(id =>
-    t.constructions->Gid.Map.get(id)->Option.map(c => (id, UndoRedo.state(c)))
+  t.order->FileTree.map(id =>
+    t.constructions->Gid.Map.get(id)->Option.map(c => (id, UndoRedo.state(c)))->Option.getExn
   )
 let construction = (t, id) => t.constructions->Gid.Map.get(id)->Option.map(UndoRedo.state)
 let spaces = t => t.spaces
@@ -234,12 +234,12 @@ let loadTypeSystems = t =>
 let load = () => None
 let store = t => ()
 
-let newConstruction = (t, id, name) => {
+let newConstruction = (t, id, name, path) => {
   let c = Construction.create(name)->UndoRedo.create
   {
     ...t,
     focused: Some(id),
-    order: t.order->Array.concat([id]),
+    order: t.order->FileTree.insertFile(~path, ~position=-1, id)->Option.getExn,
     constructions: t.constructions->Gid.Map.set(id, c),
   }
 }
@@ -255,7 +255,7 @@ let deleteConstruction = (t, id) => {
   {
     ...t,
     focused: focused,
-    order: t.order->Array.filter(id' => id' !== id),
+    order: t.order->FileTree.removeFile(id' => id' === id),
     constructions: t.constructions->Gid.Map.remove(id),
   }
 }
@@ -263,19 +263,14 @@ let deleteConstruction = (t, id) => {
 let focusConstruction = (t, id) => {...t, focused: id}
 
 let duplicateConstruction = (t, ~oldId, ~newId) => {
+  let (path, position) = t.order->FileTree.getFilePathAndPosition(id => id === oldId)->Option.getExn
   t
   ->construction(oldId)
   ->Option.map(Construction.duplicate)
   ->Option.map(construction => {
     ...t,
     focused: Some(newId),
-    order: t.order->Array.flatMap(id' =>
-      if id' === oldId {
-        [oldId, newId]
-      } else {
-        [oldId]
-      }
-    ),
+    order: t.order->FileTree.insertFile(~path, ~position=position + 1, newId)->Option.getExn,
     constructions: t.constructions->Gid.Map.set(newId, UndoRedo.create(construction)),
   })
   ->Option.getWithDefault(t)
@@ -283,12 +278,12 @@ let duplicateConstruction = (t, ~oldId, ~newId) => {
 
 let reorderConstructions = (t, order) => {...t, order: order}
 
-let importConstruction = (t, id, construction) => {
+let importConstruction = (t, id, construction, path) => {
   let c = Construction.duplicate(construction)->UndoRedo.create
   {
     ...t,
     focused: Some(id),
-    order: t.order->Array.concat([id]),
+    order: t.order->FileTree.insertFile(~path, ~position=-1, id)->Option.getExn,
     constructions: t.constructions->Gid.Map.set(id, c),
   }
 }
@@ -303,6 +298,35 @@ let updateConstruction = (t, id, f) => {
       ur_construction->UndoRedo.step(c')
     }),
   ),
+}
+
+let updateConstructionBypassingUndoRedo = (t, id, f) => {
+  ...t,
+  constructions: t.constructions->Gid.Map.update(
+    id,
+    Option.map(_, ur_construction => {
+      let c = UndoRedo.state(ur_construction)
+      let c' = f(c)
+      ur_construction->UndoRedo.replace(c')
+    }),
+  ),
+}
+
+let newFolder = (t, id, name, path) => {
+  ...t,
+  order: t.order
+  ->FileTree.newFolder(~path, ~position=-1, ~name, ~id)
+  ->Option.getWithDefault(t.order),
+}
+
+let renameFolder = (t, id, newName) => {
+  ...t,
+  order: t.order->FileTree.renameFolder(id, newName),
+}
+
+let deleteFolder = (t, id) => {
+  ...t,
+  order: t.order->FileTree.removeFolder(id),
 }
 
 let undo = (t, id) => {

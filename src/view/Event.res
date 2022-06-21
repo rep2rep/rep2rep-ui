@@ -90,12 +90,15 @@ module Construction = {
 
 type t =
   | Update(State.t)
-  | NewConstruction(Gid.t, string)
+  | NewConstruction(Gid.t, string, FileTree.Path.t)
   | DeleteConstruction(Gid.t)
   | FocusConstruction(option<Gid.t>)
   | DuplicateConstruction(Gid.t, Gid.t)
-  | ReorderConstructions(array<Gid.t>)
-  | ImportConstruction(Gid.t, State.Construction.t)
+  | ReorderConstructions(FileTree.t<Gid.t>)
+  | ImportConstruction(Gid.t, State.Construction.t, FileTree.Path.t)
+  | NewFolder(Gid.t, string, FileTree.Path.t)
+  | RenameFolder(Gid.t, string)
+  | DeleteFolder(Gid.t)
   | Undo(Gid.t)
   | Redo(Gid.t)
   | ConstructionEvent(Gid.t, Construction.t)
@@ -103,12 +106,16 @@ type t =
 let dispatch = (state, t) =>
   switch t {
   | Update(s) => s
-  | NewConstruction(id, name) => state->State.newConstruction(id, name)
+  | NewConstruction(id, name, path) => state->State.newConstruction(id, name, path)
   | DeleteConstruction(id) => state->State.deleteConstruction(id)
   | FocusConstruction(id) => state->State.focusConstruction(id)
   | DuplicateConstruction(oldId, newId) => state->State.duplicateConstruction(~oldId, ~newId)
   | ReorderConstructions(order) => state->State.reorderConstructions(order)
-  | ImportConstruction(id, construction) => state->State.importConstruction(id, construction)
+  | ImportConstruction(id, construction, path) =>
+    state->State.importConstruction(id, construction, path)
+  | NewFolder(id, name, path) => state->State.newFolder(id, name, path)
+  | RenameFolder(id, name) => state->State.renameFolder(id, name)
+  | DeleteFolder(id) => state->State.deleteFolder(id)
   | Undo(id) => state->State.undo(id)
   | Redo(id) => state->State.redo(id)
   | ConstructionEvent(id, event) =>

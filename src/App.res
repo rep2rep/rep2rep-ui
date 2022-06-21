@@ -60,7 +60,8 @@ module App = {
     let dispatchC = e =>
       focused->Option.iter(focused => dispatch(Event.ConstructionEvent(focused, e)))
 
-    let newConstruction = () => dispatch(Event.NewConstruction(Gid.create(), "Structure graph"))
+    let newConstruction = path =>
+      dispatch(Event.NewConstruction(Gid.create(), "Structure graph", path))
     let deleteConstruction = id => dispatch(Event.DeleteConstruction(id))
     let focusConstruction = id => dispatch(Event.FocusConstruction(id))
     let duplicateConstruction = id => dispatch(Event.DuplicateConstruction(id, Gid.create()))
@@ -72,8 +73,13 @@ module App = {
         ),
       )
     let reorderConstructions = newOrder => dispatch(Event.ReorderConstructions(newOrder))
-    let importConstructions = _ => Dialog.alert("Importing structure graphs is not yet supported")
+    let importConstructions = (_, _) =>
+      Dialog.alert("Importing structure graphs is not yet supported")
     let exportConstruction = id => Dialog.alert("Exporting structure graphs " ++ Gid.toString(id))
+
+    let createFolder = path => dispatch(Event.NewFolder(Gid.create(), "Folder", path))
+    let renameFolder = (id, newName) => dispatch(Event.RenameFolder(id, newName))
+    let deleteFolder = id => dispatch(Event.DeleteFolder(id))
 
     let canUndo = focused->Option.map(State.canUndo(state))->Option.getWithDefault(false)
     let canRedo = focused->Option.map(State.canRedo(state))->Option.getWithDefault(false)
@@ -188,6 +194,9 @@ module App = {
         onReorder={reorderConstructions}
         onImport={importConstructions}
         onExport={exportConstruction}
+        onCreateFolder={createFolder}
+        onDeleteFolder={deleteFolder}
+        onChangedFolderName={renameFolder}
       />
       <div
         className="editor-panel"
