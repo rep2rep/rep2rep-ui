@@ -174,6 +174,12 @@ module App = {
       }
     }
 
+    module FP = FilePanel.Make({
+      type t = State.Construction.t
+      let name = construction =>
+        construction->State.Construction.metadata->State.Construction.Metadata.name
+    })
+
     <main
       style={ReactDOM.Style.make(
         ~display="flex",
@@ -182,9 +188,12 @@ module App = {
         ~height="100%",
         (),
       )}>
-      <FilePanel
+      <FP
         id="file-panel"
-        constructions={State.constructions(state)}
+        data={State.constructions(state)}
+        title="RST Edtior"
+        version="##VERSION##"
+        importExtensions=[".rst"]
         active={State.focused(state)}
         onCreate={newConstruction}
         onDelete={deleteConstruction}
