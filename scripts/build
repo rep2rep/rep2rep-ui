@@ -5,6 +5,9 @@ BASE=`dirname '$ROOT'`
 
 STATICS="index.html"
 VERSION="$(date '+%Y-%m-%d')"
+if [[ "${NODE_ENV}" != "production" ]]; then
+    VERSION="${VERSION}-DEV"
+fi
 
 rm -rf "$BASE/dist"
 "$ROOT/rescript/rescript" build -with-deps
