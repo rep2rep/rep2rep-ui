@@ -1,4 +1,9 @@
 module BoolStore = LocalStorage.MakeJsonable(Bool)
+module K = GlobalKeybindings.KeyBinding
+module FP = {
+  include FilePanel
+  let make = React.memo(make)
+}
 
 module App = {
   let init = State.load()->Option.getWithDefault(State.empty)
@@ -143,7 +148,6 @@ module App = {
 
     let inspectorChange = e => dispatchC(e)
 
-    module K = GlobalKeybindings.KeyBinding
     GlobalKeybindings.set([
       K.create("Cmd+z", undo),
       K.create("Cmd+Shift+z", redo),
@@ -174,12 +178,6 @@ module App = {
       }
     }
 
-    module FP = FilePanel.Make({
-      type t = State.Construction.t
-      let name = construction =>
-        construction->State.Construction.metadata->State.Construction.Metadata.name
-    })
-
     <main
       style={ReactDOM.Style.make(
         ~display="flex",
@@ -191,6 +189,8 @@ module App = {
       <FP
         id="file-panel"
         data={State.constructions(state)}
+        dataName={construction =>
+          construction->State.Construction.metadata->State.Construction.Metadata.name}
         title="RST Edtior"
         version="##VERSION##"
         importExtensions=[".rst"]
