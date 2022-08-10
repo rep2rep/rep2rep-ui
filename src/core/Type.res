@@ -1,6 +1,8 @@
 type typ = string
 
 let typ_rpc = String.t_rpc->Rpc.Datatype.alias("Type.typ")
+let typ_toJson = String.toJson
+let typ_fromJson = String.fromJson
 
 let fromString = t => t
 let name = t => t

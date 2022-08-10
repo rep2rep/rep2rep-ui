@@ -45,8 +45,10 @@ let typeSystems: t => String.Map.t<FiniteSet.t<Type.PrincipalType.t>>
 let loadSpaces: t => Rpc.Response.t<t>
 let loadTypeSystems: t => Rpc.Response.t<t>
 
-let load: unit => option<t>
+let setDB: (IndexedDB.t, string) => unit
+
 let store: t => unit
+let load: unit => Promise.t<option<t>>
 
 let newConstruction: (t, Gid.t, string, FileTree.Path.t) => t
 let deleteConstruction: (t, Gid.t) => t

@@ -9,6 +9,14 @@ module GraphNode: {
   let data: t => array<ReactD3Graph.Node.t<[#token | #constructor]>>
   let move: (t, ~x: float, ~y: float) => t
   let setData: (t, nodeData) => t
+
+  module Stable: {
+    module V1: {
+      type t = t
+      let toJson: t => Js.Json.t
+      let fromJson: Js.Json.t => Or_error.t<t>
+    }
+  }
 }
 
 module GraphLink: {
@@ -44,3 +52,11 @@ let deleteNode: (t, Gid.t) => t
 let deleteLink: (t, Gid.t) => t
 let setSelection: (t, Selection.t) => t
 let incidentLinks: (t, ~nodeId: Gid.t) => {"in": array<Gid.t>, "out": array<Gid.t>}
+
+module Stable: {
+  module V1: {
+    type t = t
+    let toJson: t => Js.Json.t
+    let fromJson: Js.Json.t => Or_error.t<t>
+  }
+}

@@ -6,7 +6,20 @@ module FP = {
 }
 
 module App = {
-  let init = State.load()->Option.getWithDefault(State.empty)
+  let db_store = "RST"
+  let db_ready = IndexedDB.open_(~name="rst", ~version=1, ~onUpgradeNeeded=db =>
+    db->IndexedDB.createObjectStore(db_store)
+  )->Promise.thenResolve(db => {
+    db->IndexedDB.onError(e => {
+      Js.Console.log(e)
+      Dialog.alert("Database Error!")
+    })
+    State.setDB(db, db_store)
+  })
+  let init =
+    db_ready
+    ->Promise.then(_ => State.load())
+    ->Promise.thenResolve(s => s->Option.getWithDefault(State.empty))
   let reducer = (state, action) => {
     let newState = Event.dispatch(state, action)
     State.store(newState)
@@ -40,7 +53,7 @@ module App = {
   )
 
   @react.component
-  let make = () => {
+  let make = (~init) => {
     let (state, dispatch) = React.useReducer(reducer, init)
 
     React.useEffect0(() => {
@@ -377,5 +390,5 @@ module App = {
 
 switch ReactDOM.querySelector("#root") {
 | None => ()
-| Some(e) => ReactDOM.render(<App />, e)
+| Some(e) => App.init->Promise.thenResolve(init => ReactDOM.render(<App init />, e))->ignore
 }

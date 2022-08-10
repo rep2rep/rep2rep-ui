@@ -1,8 +1,54 @@
+let db = SetOnce.create()
+
 module Construction = {
   module Metadata = {
     type t = {
       name: string,
       notes: string,
+    }
+
+    module Stable = {
+      module V1 = {
+        type t = t = {
+          name: string,
+          notes: string,
+        }
+
+        let toJson = t =>
+          Js.Dict.fromArray([
+            ("version", 1->Int.toJson),
+            ("name", t.name->String.toJson),
+            ("notes", t.notes->String.toJson),
+          ])->Js.Json.object_
+
+        let fromJson = json =>
+          json
+          ->Js.Json.decodeObject
+          ->Or_error.fromOption_s("Failed to decode Construction Metadata state object JSON")
+          ->Or_error.flatMap(dict => {
+            let getValue = (key, reader) =>
+              dict
+              ->Js.Dict.get(key)
+              ->Or_error.fromOption_ss(["Unable to find key '", key, "'"])
+              ->Or_error.flatMap(reader)
+            let version = getValue("version", Int.fromJson)
+            switch version->Or_error.match {
+            | Or_error.Ok(1) => {
+                let name = getValue("name", String.fromJson)
+                let notes = getValue("notes", String.fromJson)
+                (name, notes)
+                ->Or_error.both
+                ->Or_error.map(((name, notes)) => {
+                  name: name,
+                  notes: notes,
+                })
+              }
+            | Or_error.Ok(v) =>
+              Or_error.error_ss(["Unknown Construction Metadata version ", Int.toString(v)])
+            | Or_error.Err(e) => Or_error.error(e)
+            }
+          })
+      }
     }
 
     let name = t => t.name
@@ -23,6 +69,120 @@ module Construction = {
     graph: GraphState.t,
   }
 
+  module Stable = {
+    module V1 = {
+      type t = t = {
+        metadata: Metadata.Stable.V1.t,
+        space: option<CSpace.conSpec>,
+        tokenData: Gid.Map.t<TokenData.Stable.V1.t>,
+        constructorData: Gid.Map.t<ConstructorData.Stable.V1.t>,
+        edgeData: Gid.Map.t<EdgeData.Stable.V1.t>,
+        graph: GraphState.Stable.V1.t,
+      }
+
+      let toJson = t =>
+        Js.Dict.fromArray([
+          ("version", 1->Int.toJson),
+          ("metadata", t.metadata->Metadata.Stable.V1.toJson),
+          ("space", t.space->Option.toJson(CSpace.conSpec_toJson)),
+          ("tokenData", t.tokenData->Gid.Map.toJson(TokenData.Stable.V1.toJson)),
+          ("constructorData", t.constructorData->Gid.Map.toJson(ConstructorData.Stable.V1.toJson)),
+          ("edgeData", t.edgeData->Gid.Map.toJson(EdgeData.Stable.V1.toJson)),
+          ("graph", t.graph->GraphState.Stable.V1.toJson),
+        ])->Js.Json.object_
+
+      let fromJson = json =>
+        json
+        ->Js.Json.decodeObject
+        ->Or_error.fromOption_s("Failed to decode Construction state object JSON")
+        ->Or_error.flatMap(dict => {
+          let getValue = (key, reader) =>
+            dict
+            ->Js.Dict.get(key)
+            ->Or_error.fromOption_ss(["Unable to find key '", key, "'"])
+            ->Or_error.flatMap(reader)
+          let version = getValue("version", Int.fromJson)
+          switch version->Or_error.match {
+          | Or_error.Ok(1) => {
+              let metadata = getValue("metadata", Metadata.Stable.V1.fromJson)
+              let space = getValue("space", Option.fromJson(_, CSpace.conSpec_fromJson))
+              let tokenData = getValue(
+                "tokenData",
+                Gid.Map.fromJson(_, TokenData.Stable.V1.fromJson),
+              )
+              let constructorData = getValue(
+                "constructorData",
+                Gid.Map.fromJson(_, ConstructorData.Stable.V1.fromJson),
+              )
+              let edgeData = getValue("edgeData", Gid.Map.fromJson(_, EdgeData.Stable.V1.fromJson))
+              let graph = getValue("graph", GraphState.Stable.V1.fromJson)
+              (metadata, space, tokenData, constructorData, edgeData, graph)
+              ->Or_error.both6
+              ->Or_error.map(((metadata, space, tokenData, constructorData, edgeData, graph)) => {
+                metadata: metadata,
+                space: space,
+                tokenData: tokenData,
+                constructorData: constructorData,
+                edgeData: edgeData,
+                graph: graph,
+              })
+            }
+          | Or_error.Ok(v) => Or_error.error_ss(["Unknown Construction version ", Int.toString(v)])
+          | Or_error.Err(e) => Or_error.error(e)
+          }
+        })
+    }
+  }
+
+  module StorageMkr = (J: LocalStorage.Jsonable) => {
+    let set = (key, value) => {
+      let str = J.toJson(value)->Js.Json.stringify
+      switch db->SetOnce.get {
+      | None => Dialog.alert("Failed to save! Couldn't connect to database")
+      | Some((db, store)) =>
+        db
+        ->IndexedDB.put(~store, ~key, str)
+        ->Promise.catch(_ => {
+          Dialog.alert("Failed to save! Couldn't write data")
+          Promise.resolve(str)
+        })
+        ->ignore
+      }
+    }
+
+    let get = key => {
+      switch db->SetOnce.get {
+      | None =>
+        Or_error.error_s("Failed to read model - could not connect to database!")->Promise.resolve
+      | Some((db, store)) =>
+        db
+        ->IndexedDB.get(~store, ~key)
+        ->Promise.thenResolve(s => s->Js.Json.parseExn->J.fromJson)
+        ->Promise.catch(_ => {
+          let msg = "Failed to load model " ++ key ++ "."
+          Js.Console.log(msg)
+          Promise.resolve(Or_error.error_s(msg))
+        })
+      }
+    }
+
+    let delete = key => {
+      switch db->SetOnce.get {
+      | None => Dialog.alert("Failed to delete model - could not connect to database!")
+      | Some((db, store)) =>
+        db
+        ->IndexedDB.delete(~store, ~key)
+        ->Promise.catch(e => {
+          Js.Console.log(e)
+          Dialog.alert("Failed to delete model!")
+          Promise.resolve()
+        })
+        ->ignore
+      }
+    }
+  }
+  module Storage = StorageMkr(Stable.V1)
+
   let graph = t => t.graph
   let metadata = t => t.metadata
   let space = t => t.space
@@ -35,6 +195,11 @@ module Construction = {
     edgeData: Gid.Map.empty(),
     graph: GraphState.empty,
   }
+
+  let prefix = "RepNotation:Model:"
+  let store = (t, id) => Storage.set(prefix ++ Gid.toString(id), t)
+  let load = id => Storage.get(prefix ++ Gid.toString(id))
+  let delete = id => Storage.delete(prefix ++ Gid.toString(id))
 
   let isEmpty = t =>
     t.tokenData->Gid.Map.size === 0 &&
@@ -236,8 +401,70 @@ let loadTypeSystems = t =>
     typeSystems: systems->String.Map.fromArray,
   })
 
-let load = () => None
-let store = t => ()
+let setDB = (newDB, store) => db->SetOnce.set((newDB, store))
+
+let load = () => {
+  let focused = LocalStorage.Raw.getItem("RST:Focused")->Option.flatMap(s => {
+    let json = try Or_error.create(Js.Json.parseExn(s)) catch {
+    | _ => Or_error.error_s("Badly stored Focused")
+    }
+    json->Or_error.flatMap(json => json->Option.fromJson(Gid.fromJson))->Or_error.toOption
+  })
+  let order = LocalStorage.Raw.getItem("RST:Order")->Option.flatMap(s => {
+    let json = try Or_error.create(Js.Json.parseExn(s)) catch {
+    | _ => Or_error.error_s("Badly stored Order")
+    }
+    json
+    ->Or_error.flatMap(json => json->FileTree.Stable.V2.fromJson(Gid.fromJson))
+    ->Or_error.toOption
+  })
+  let constructions =
+    order
+    ->Option.map(order => {
+      order
+      ->FileTree.flatten
+      ->Array.map(id => Construction.load(id)->Promise.thenResolve(c => (id, c)))
+      ->Promise.all
+      ->Promise.thenResolve(arr =>
+        arr
+        ->Array.keepMap(((id, model)) =>
+          switch model->Or_error.match {
+          | Or_error.Ok(m) => (id, UndoRedo.create(m))->Some
+          | Or_error.Err(e) => {
+              Dialog.alert(
+                "Error loading construction: " ++ Error.messages(e)->Js.Array2.joinWith(";"),
+              )
+              None
+            }
+          }
+        )
+        ->Gid.Map.fromArray
+        ->Some
+      )
+    })
+    ->Option.getWithDefault(Promise.resolve(None))
+
+  constructions->Promise.thenResolve(constructions => {
+    Option.both3((focused, order, constructions))->Option.map(((focused, order, constructions)) => {
+      focused: focused,
+      order: order,
+      constructions: constructions,
+      spaces: String.Map.empty,
+      typeSystems: String.Map.empty,
+    })
+  })
+}
+
+let store = t => {
+  LocalStorage.Raw.setItem("RST:Focused", t.focused->Option.toJson(Gid.toJson)->Js.Json.stringify)
+  LocalStorage.Raw.setItem(
+    "RST:Order",
+    t.order->FileTree.Stable.V2.toJson(Gid.toJson)->Js.Json.stringify,
+  )
+  t.constructions->Gid.Map.forEach((id, construction) =>
+    Construction.store(construction->UndoRedo.state, id)
+  )
+}
 
 let newConstruction = (t, id, name, path) => {
   let c = Construction.create(name)->UndoRedo.create

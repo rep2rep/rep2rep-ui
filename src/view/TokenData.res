@@ -6,6 +6,61 @@ type t = {
   notes: string,
 }
 
+module Stable = {
+  module V1 = {
+    type t = t = {
+      label: string,
+      payload: option<string>,
+      type_: option<Type.typ>,
+      subtype: option<string>,
+      notes: string,
+    }
+
+    let toJson = t =>
+      Js.Dict.fromArray([
+        ("version", 1->Int.toJson),
+        ("label", t.label->String.toJson),
+        ("payload", t.payload->Option.toJson(String.toJson)),
+        ("type_", t.type_->Option.toJson(Type.typ_toJson)),
+        ("subtype", t.subtype->Option.toJson(String.toJson)),
+        ("notes", t.notes->String.toJson),
+      ])->Js.Json.object_
+
+    let fromJson = json =>
+      json
+      ->Js.Json.decodeObject
+      ->Or_error.fromOption_s("Failed to decode TokenData object JSON")
+      ->Or_error.flatMap(dict => {
+        let getValue = (key, reader) =>
+          dict
+          ->Js.Dict.get(key)
+          ->Or_error.fromOption_ss(["Unable to find key '", key, "'"])
+          ->Or_error.flatMap(reader)
+        let version = getValue("version", Int.fromJson)
+        switch version->Or_error.match {
+        | Or_error.Ok(1) => {
+            let label = getValue("label", String.fromJson)
+            let payload = getValue("payload", Option.fromJson(_, String.fromJson))
+            let type_ = getValue("type_", Option.fromJson(_, Type.typ_fromJson))
+            let subtype = getValue("subtype", Option.fromJson(_, String.fromJson))
+            let notes = getValue("notes", String.fromJson)
+            (label, payload, type_, subtype, notes)
+            ->Or_error.both5
+            ->Or_error.map(((label, payload, type_, subtype, notes)) => {
+              label: label,
+              payload: payload,
+              type_: type_,
+              subtype: subtype,
+              notes: notes,
+            })
+          }
+        | Or_error.Ok(v) => Or_error.error_ss(["Unknown TokenData version ", Int.toString(v)])
+        | Or_error.Err(e) => Or_error.error(e)
+        }
+      })
+  }
+}
+
 let create = (~payload=?, ~type_=?, ~subtype=?, ~notes="", label) => {
   label: label,
   payload: payload,

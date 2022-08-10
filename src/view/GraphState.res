@@ -6,7 +6,7 @@ module GraphNode = {
     | Token(TokenData.t)
     | Constructor(ConstructorData.t)
 
-  type t = ReactD3Graph.Node.t<[#token | #constructor]>
+  type t = (ReactD3Graph.Node.t<[#token | #constructor]>, nodeData)
 
   let unselectedFill = "white"
   let selectedFill = "rgb(220, 220, 220)"
@@ -81,29 +81,106 @@ module GraphNode = {
       (),
     )
 
-  let create = (id, ~x, ~y, payload) => {
-    let (config, payload) = switch payload {
+  let create = (id, ~x, ~y, nodeData) => {
+    let (config, payload) = switch nodeData {
     | Token(data) => (tokenConfig(data), #token)
     | Constructor(data) => (constructorConfig(data), #constructor)
     }
-    ReactD3Graph.Node.create(~id=fromGid(id), ~payload, ~x, ~y, ~config, ())
+    (ReactD3Graph.Node.create(~id=fromGid(id), ~payload, ~x, ~y, ~config, ()), nodeData)
   }
 
-  let data = t => [t]
-  let id = t => ReactD3Graph.Node.id(t)->toGid
-  let duplicate = (t, newId) => t->ReactD3Graph.Node.setId(newId->fromGid)
-  let move = (t, ~x, ~y) => t->ReactD3Graph.Node.setX(x)->ReactD3Graph.Node.setY(y)
-  let setData = (t, newPayload) => {
+  let data = ((t, _)) => [t]
+  let id = ((t, _)) => ReactD3Graph.Node.id(t)->toGid
+  let duplicate = ((t, p), newId) => (t->ReactD3Graph.Node.setId(newId->fromGid), p)
+  let move = ((t, p), ~x, ~y) => (t->ReactD3Graph.Node.setX(x)->ReactD3Graph.Node.setY(y), p)
+  let setData = ((t, _), newPayload) => {
     let config = switch newPayload {
     | Token(data) => tokenConfig(data)
     | Constructor(data) => constructorConfig(data)
     }
-    ReactD3Graph.Node.updateConfig(t, _ => config)
+    (ReactD3Graph.Node.updateConfig(t, _ => config), newPayload)
+  }
+
+  module Stable = {
+    module V1 = {
+      type nodeData = nodeData =
+        | Token(TokenData.Stable.V1.t)
+        | Constructor(ConstructorData.Stable.V1.t)
+      type t = (ReactD3Graph.Node.t<[#token | #constructor]>, nodeData)
+
+      let toJson = ((t, p)) =>
+        Js.Dict.fromArray([
+          ("version", 1->Int.toJson),
+          ("id", t->ReactD3Graph.Node.id->toGid->Gid.toJson),
+          (
+            "kind",
+            switch p {
+            | Token(_) => "token"->String.toJson
+            | Constructor(_) => "constructor"->String.toJson
+            },
+          ),
+          (
+            "payload",
+            switch p {
+            | Token(d) => d->TokenData.Stable.V1.toJson
+            | Constructor(d) => d->ConstructorData.Stable.V1.toJson
+            },
+          ),
+          ("x", t->ReactD3Graph.Node.x->Float.toJson),
+          ("y", t->ReactD3Graph.Node.y->Float.toJson),
+        ])->Js.Json.object_
+
+      let fromJson = json =>
+        json
+        ->Js.Json.decodeObject
+        ->Or_error.fromOption_s("Failed to decode GraphNode object JSON")
+        ->Or_error.flatMap(dict => {
+          let getValue = (key, reader) =>
+            dict
+            ->Js.Dict.get(key)
+            ->Or_error.fromOption_ss(["Unable to find key '", key, "'"])
+            ->Or_error.flatMap(reader)
+          let version = getValue("version", Int.fromJson)
+          switch version->Or_error.match {
+          | Or_error.Ok(1) => {
+              let id = getValue("id", Gid.fromJson)
+              let kind = getValue("kind", j =>
+                j
+                ->String.fromJson
+                ->Or_error.flatMap(s =>
+                  switch s {
+                  | "token" => #token->Or_error.create
+                  | "constructor" => #constructor->Or_error.create
+                  | _ => Or_error.error_ss(["Unknown GraphNode kind: ", s])
+                  }
+                )
+              )
+              let payload =
+                (kind, getValue("payload", Or_error.create))
+                ->Or_error.both
+                ->Or_error.flatMap(((kind, payload)) =>
+                  switch kind {
+                  | #token => payload->TokenData.Stable.V1.fromJson->Or_error.map(t => Token(t))
+                  | #constructor =>
+                    payload->ConstructorData.Stable.V1.fromJson->Or_error.map(c => Constructor(c))
+                  }
+                )
+              let x = getValue("x", Float.fromJson)
+              let y = getValue("y", Float.fromJson)
+              (id, payload, x, y)
+              ->Or_error.both4
+              ->Or_error.map(((id, payload, x, y)) => create(id, ~x, ~y, payload))
+            }
+          | Or_error.Ok(v) => Or_error.error_ss(["Unknown GraphNode version ", Int.toString(v)])
+          | Or_error.Err(e) => Or_error.error(e)
+          }
+        })
+    }
   }
 }
 
 module GraphLink = {
-  type t = ReactD3Graph.Link.t<unit>
+  type t = (ReactD3Graph.Link.t<unit>, EdgeData.t)
 
   let makeConfig = edgeData => {
     let offsets = (src, tgt, _) =>
@@ -197,7 +274,7 @@ module GraphLink = {
     )
   }
 
-  let create = (id, ~source, ~target, ~edgeData) =>
+  let create = (id, ~source, ~target, ~edgeData) => (
     ReactD3Graph.Link.create(
       ~source=fromGid(source),
       ~target=fromGid(target),
@@ -205,20 +282,75 @@ module GraphLink = {
       ~payload=(),
       ~config=makeConfig(edgeData),
       (),
-    )
+    ),
+    edgeData,
+  )
 
-  let data = t => [t]
-  let id = t =>
+  let data = ((t, _)) => [t]
+  let id = ((t, _)) =>
     ReactD3Graph.Link.id(t)->Option.getExn->ReactD3Graph.Link.Id.toString->Gid.fromString
-  let source = t => ReactD3Graph.Link.source(t)->toGid
-  let target = t => ReactD3Graph.Link.target(t)->toGid
-  let duplicate = (t, newSource, newTarget) =>
+  let source = ((t, _)) => ReactD3Graph.Link.source(t)->toGid
+  let target = ((t, _)) => ReactD3Graph.Link.target(t)->toGid
+  let duplicate = ((t, p), newSource, newTarget) => (
     t
     ->ReactD3Graph.Link.setSource(newSource->fromGid)
-    ->ReactD3Graph.Link.setTarget(newTarget->fromGid)
-  let setData = (t, newPayload) => {
+    ->ReactD3Graph.Link.setTarget(newTarget->fromGid),
+    p,
+  )
+  let setData = ((t, _), newPayload) => {
     let config = makeConfig(newPayload)
-    ReactD3Graph.Link.updateConfig(t, _ => config)
+    (ReactD3Graph.Link.updateConfig(t, _ => config), newPayload)
+  }
+
+  module Stable = {
+    module V1 = {
+      type t = (ReactD3Graph.Link.t<unit>, EdgeData.Stable.V1.t)
+
+      let toJson = ((t, p)) =>
+        Js.Dict.fromArray([
+          ("version", 1->Int.toJson),
+          (
+            "id",
+            t
+            ->ReactD3Graph.Link.id
+            ->Option.getExn
+            ->ReactD3Graph.Link.Id.toString
+            ->Gid.fromString
+            ->Gid.toJson,
+          ),
+          ("source", t->ReactD3Graph.Link.source->toGid->Gid.toJson),
+          ("target", t->ReactD3Graph.Link.target->toGid->Gid.toJson),
+          ("payload", p->EdgeData.Stable.V1.toJson),
+        ])->Js.Json.object_
+
+      let fromJson = json =>
+        json
+        ->Js.Json.decodeObject
+        ->Or_error.fromOption_s("Failed to decode GraphLink object JSON")
+        ->Or_error.flatMap(dict => {
+          let getValue = (key, reader) =>
+            dict
+            ->Js.Dict.get(key)
+            ->Or_error.fromOption_ss(["Unable to find key '", key, "'"])
+            ->Or_error.flatMap(reader)
+          let version = getValue("version", Int.fromJson)
+          switch version->Or_error.match {
+          | Or_error.Ok(1) => {
+              let id = getValue("id", Gid.fromJson)
+              let source = getValue("source", Gid.fromJson)
+              let target = getValue("target", Gid.fromJson)
+              let payload = getValue("payload", EdgeData.Stable.V1.fromJson)
+              (id, source, target, payload)
+              ->Or_error.both4
+              ->Or_error.map(((id, source, target, payload)) =>
+                create(id, ~source, ~target, ~edgeData=payload)
+              )
+            }
+          | Or_error.Ok(v) => Or_error.error_ss(["Unknown GraphLink version ", Int.toString(v)])
+          | Or_error.Err(e) => Or_error.error(e)
+          }
+        })
+    }
   }
 }
 
@@ -327,4 +459,49 @@ let incidentLinks = (t, ~nodeId) => {
     }
   })
   {"in": inLinks, "out": outLinks}
+}
+
+module Stable = {
+  module V1 = {
+    type t = t = {
+      nodes: array<GraphNode.Stable.V1.t>,
+      links: array<GraphLink.Stable.V1.t>,
+      selection: Selection.t,
+    }
+
+    let toJson = t =>
+      Js.Dict.fromArray([
+        ("version", 1->Int.toJson),
+        ("nodes", t.nodes->Array.toJson(GraphNode.Stable.V1.toJson)),
+        ("links", t.links->Array.toJson(GraphLink.Stable.V1.toJson)),
+      ])->Js.Json.object_
+
+    let fromJson = json =>
+      json
+      ->Js.Json.decodeObject
+      ->Or_error.fromOption_s("Failed to decode GraphState object JSON")
+      ->Or_error.flatMap(dict => {
+        let getValue = (key, reader) =>
+          dict
+          ->Js.Dict.get(key)
+          ->Or_error.fromOption_ss(["Unable to find key '", key, "'"])
+          ->Or_error.flatMap(reader)
+        let version = getValue("version", Int.fromJson)
+        switch version->Or_error.match {
+        | Or_error.Ok(1) => {
+            let nodes = getValue("nodes", Array.fromJson(_, GraphNode.Stable.V1.fromJson))
+            let links = getValue("links", Array.fromJson(_, GraphLink.Stable.V1.fromJson))
+            (nodes, links)
+            ->Or_error.both
+            ->Or_error.map(((nodes, links)) => {
+              nodes: nodes,
+              links: links,
+              selection: Selection.empty,
+            })
+          }
+        | Or_error.Ok(v) => Or_error.error_ss(["Unknown ConstructorData version ", Int.toString(v)])
+        | Or_error.Err(e) => Or_error.error(e)
+        }
+      })
+  }
 }

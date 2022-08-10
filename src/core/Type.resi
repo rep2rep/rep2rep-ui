@@ -1,5 +1,7 @@
 type typ
 let typ_rpc: Rpc.Datatype.t<typ>
+let typ_toJson: typ => Js.Json.t
+let typ_fromJson: Js.Json.t => Or_error.t<typ>
 
 let fromString: string => typ
 let name: typ => string
