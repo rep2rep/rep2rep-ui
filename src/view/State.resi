@@ -31,6 +31,14 @@ module Construction: {
   let setSelection: (t, GraphState.Selection.t) => t
   let getNode: (t, Gid.t) => option<[#token(TokenData.t) | #constructor(ConstructorData.t)]>
   let getLink: (t, Gid.t) => option<EdgeData.t>
+
+  module Stable: {
+    module V1: {
+      type t = t
+      let toJson: t => Js.Json.t
+      let fromJson: Js.Json.t => Or_error.t<t>
+    }
+  }
 }
 
 type t

@@ -90,9 +90,56 @@ module App = {
         ),
       )
     let reorderConstructions = newOrder => dispatch(Event.ReorderConstructions(newOrder))
-    let importConstructions = (_, _) =>
-      Dialog.alert("Importing structure graphs is not yet supported")
-    let exportConstruction = id => Dialog.alert("Exporting structure graphs " ++ Gid.toString(id))
+    let importConstructions = (fs, path) =>
+      fs->Array.forEach(f => {
+        File.text(f)
+        |> Js.Promise.then_(text => {
+          let construction = try text
+          ->Js.Json.parseExn
+          ->State.Construction.Stable.V1.fromJson catch {
+          | _ => Or_error.error_s("fail")
+          }
+          switch construction->Or_error.match {
+          | Or_error.Ok(construction) => {
+              let construction =
+                construction->State.Construction.updateMetadata(m =>
+                  m->State.Construction.Metadata.setNotes(
+                    m->State.Construction.Metadata.notes ++
+                    "\n*** Imported " ++
+                    Js.Date.make()->Js.Date.toString ++ " ***",
+                  )
+                )
+              dispatch(Event.ImportConstruction(Gid.create(), construction, path))
+            }
+          | Or_error.Err(e) => {
+              Js.Console.log(e)
+              Dialog.alert("Failed to import '" ++ File.name(f) ++ "'.")
+            }
+          }
+          Js.Promise.resolve()
+        })
+        |> ignore
+      })
+
+    let exportConstruction = id => {
+      state
+      ->State.construction(id)
+      ->Option.iter(construction => {
+        let construction =
+          construction->State.Construction.updateMetadata(m =>
+            m->State.Construction.Metadata.setNotes(
+              m->State.Construction.Metadata.notes ++
+              "\n=== Exported " ++
+              Js.Date.make()->Js.Date.toString ++ " ===",
+            )
+          )
+        let name = construction->State.Construction.metadata->State.Construction.Metadata.name
+        let json = State.Construction.Stable.V1.toJson(construction)
+        let content =
+          "data:text/json;charset=utf-8," ++ json->Js.Json.stringify->Js.Global.encodeURIComponent
+        Downloader.download(name ++ ".rst", content)
+      })
+    }
 
     let createFolder = path => dispatch(Event.NewFolder(Gid.create(), "Folder", path))
     let renameFolder = (id, newName) => dispatch(Event.RenameFolder(id, newName))
