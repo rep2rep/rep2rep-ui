@@ -218,7 +218,11 @@ module Construction = {
   }
 
   let duplicate = t => {
-    let idMap = Gid.Map.merge(t.tokenData, t.constructorData, (_, _, _) => Some(Gid.create()))
+    let idMap =
+      Gid.Map.merge(t.tokenData, t.constructorData, (_, _, _) => Some(0))->Gid.Map.merge(
+        t.edgeData,
+        (_, _, _) => Some(Gid.create()),
+      )
     {
       metadata: t.metadata->Metadata.duplicate,
       space: t.space,
