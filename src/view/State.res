@@ -477,6 +477,7 @@ let newConstruction = (t, id, name, path) => {
 }
 
 let deleteConstruction = (t, id) => {
+  Construction.delete(id)
   let focused = t.focused->Option.flatMap(curr =>
     if curr === id {
       None
