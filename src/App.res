@@ -61,7 +61,6 @@ module App = {
       ->State.loadSpaces
       ->Rpc.Response.flatMap(State.loadTypeSystems)
       ->Rpc.Response.upon(state => {
-        Js.Console.log(state)
         dispatch(Event.Update(state))
       })
       None
