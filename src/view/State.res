@@ -186,6 +186,9 @@ module Construction = {
   let graph = t => t.graph
   let metadata = t => t.metadata
   let space = t => t.space
+  let tokens = t => t.tokenData->Gid.Map.keys
+  let constructors = t => t.constructorData->Gid.Map.keys
+  let links = t => t.edgeData->Gid.Map.keys
 
   let create = name => {
     metadata: Metadata.create(name),

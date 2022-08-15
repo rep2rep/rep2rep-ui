@@ -12,6 +12,9 @@ module Construction: {
 
   let graph: t => GraphState.t
   let metadata: t => Metadata.t
+  let tokens: t => array<Gid.t>
+  let constructors: t => array<Gid.t>
+  let links: t => array<Gid.t>
   let space: t => option<CSpace.conSpec>
 
   let isEmpty: t => bool
