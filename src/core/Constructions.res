@@ -178,14 +178,4 @@ let fromViewConstruction = c => {
 
 let url = s => "core.construction." ++ s
 
-let size = Rpc_service.require(url("size"), construction_rpc, Int.t_rpc)
-let leavesOfConstruction = Rpc_service.require(
-  url("leavesOfConstruction"),
-  construction_rpc,
-  Array.t_rpc(CSpace.token_rpc),
-)
-let fullTokenSequence = Rpc_service.require(
-  url("fullTokenSequence"),
-  construction_rpc,
-  Array.t_rpc(CSpace.token_rpc),
-)
+let toOrugaString = Rpc_service.require(url("toString"), construction_rpc, String.t_rpc)
