@@ -127,34 +127,72 @@ let fromViewConstruction = c => {
                 constructor: cons,
               }
               // ... we find all input tokens...
-              let inputToks = links->Array.keepMap(l =>
+              links
+              ->Array.keepMap(l =>
                 if EdgeData.target(l) === cid {
-                  Some(EdgeData.source(l))
+                  EdgeData.payload(l)
+                  ->Or_error.fromOption_s("Arrow has no number")
+                  ->Or_error.flatMap(idx =>
+                    if idx <= 0 {
+                      Or_error.error_ss([
+                        "Arrows into constructors must be labelled with positive numbers, not ",
+                        Int.toString(idx),
+                      ])
+                    } else {
+                      Or_error.create(idx)
+                    }
+                  )
+                  ->Or_error.map(idx => (idx, EdgeData.source(l)))
+                  ->Some
                 } else {
                   None
                 }
               )
-              // ... then recursively find all ways to make those
-              let rec buildConstructionsForTokens = (i, usedTokens, result) => {
-                if i === Array.length(inputToks) {
-                  [(Or_error.create(result), usedTokens)]
+              ->Or_error.allArray
+              ->Or_error.flatMap(arrows => {
+                // Check that the incoming arrows are all unique
+                if (
+                  arrows->Array.map(fst)->Belt.Set.Int.fromArray->Belt.Set.Int.size ===
+                    Array.length(arrows)
+                ) {
+                  Or_error.create(arrows)
                 } else {
-                  let tokId = inputToks[i]->Option.getExn
-                  switch makeConstructions(tokId, usedTokens)->Or_error.match {
-                  | Or_error.Ok(options) =>
-                    options->Array.flatMap(((cons, usedTokens)) =>
-                      buildConstructionsForTokens(i + 1, usedTokens, result->Array.push(cons))
-                    )
-                  | Or_error.Err(e) => [(Or_error.error(e), usedTokens)]
+                  Or_error.error_s("Arrows have duplicated values")
+                }
+              })
+              ->Or_error.flatMap(arrows => {
+                let count = Array.length(arrows)
+                if arrows->Array.map(fst)->Array.some(idx => idx > count) {
+                  Or_error.error_s("Arrows into a constructor must be numbered 1 to n")
+                } else {
+                  Or_error.create(arrows)
+                }
+              })
+              ->Or_error.flatMap(inputToks => {
+                inputToks->Js.Array2.sortInPlaceWith(((i, _), (j, _)) => i - j)->ignore
+                let inputToks = inputToks->Array.map(snd)
+                // ... then recursively find all ways to make those
+                let rec buildConstructionsForTokens = (i, usedTokens, result) => {
+                  if i === Array.length(inputToks) {
+                    [(Or_error.create(result), usedTokens)]
+                  } else {
+                    let tokId = inputToks[i]->Option.getExn
+                    switch makeConstructions(tokId, usedTokens)->Or_error.match {
+                    | Or_error.Ok(options) =>
+                      options->Array.flatMap(((cons, usedTokens)) =>
+                        buildConstructionsForTokens(i + 1, usedTokens, result->Array.push(cons))
+                      )
+                    | Or_error.Err(e) => [(Or_error.error(e), usedTokens)]
+                    }
                   }
                 }
-              }
-              // We end up with all possible ways to build this constructor!
-              buildConstructionsForTokens(0, usedTokens, [])
-              ->Array.map(((inputConstructions, usedTokens)) =>
-                inputConstructions->Or_error.map(ic => (TCPair(tc, ic), usedTokens))
-              )
-              ->Or_error.allArray
+                // We end up with all possible ways to build this constructor!
+                buildConstructionsForTokens(0, usedTokens, [])
+                ->Array.map(((inputConstructions, usedTokens)) =>
+                  inputConstructions->Or_error.map(ic => (TCPair(tc, ic), usedTokens))
+                )
+                ->Or_error.allArray
+              })
             })
           })
           // We then flatten all combinations of constructors and input tokens
