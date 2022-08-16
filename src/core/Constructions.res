@@ -59,6 +59,123 @@ let vertex_rpc = Rpc.Datatype.either2_(
 
 let walk_rpc = Array.t_rpc(vertex_rpc)->Rpc.Datatype.alias("Constructions.walk")
 
+let fromViewConstruction = c => {
+  let tokens =
+    c
+    ->State.Construction.tokens
+    ->Array.mapPartial(id => State.Construction.getNode(c, id)->Option.map(t => (id, t)))
+    ->Array.mapPartial(((id, n)) =>
+      switch n {
+      | #token(t) => Some((id, t))
+      | _ => None
+      }
+    )
+  let constructors =
+    c
+    ->State.Construction.constructors
+    ->Array.mapPartial(id => State.Construction.getNode(c, id)->Option.map(c' => (id, c')))
+    ->Array.mapPartial(((id, n)) =>
+      switch n {
+      | #constructor(c) => Some((id, c))
+      | _ => None
+      }
+    )
+  let links = c->State.Construction.links->Array.mapPartial(State.Construction.getLink(c))
+  let constructs =
+    tokens->Array.filter(((id, _)) => links->Array.some(l => l->EdgeData.source === id)->not)
+  let tokens = tokens->Gid.Map.fromArray
+  let constructors = constructors->Gid.Map.fromArray
+
+  let rec makeConstructions = (construct, usedTokens) => {
+    switch usedTokens->Gid.Map.get(construct) {
+    // If we've already seen this token, reference it.
+    | Some(tok) => Or_error.create([(Reference(tok), usedTokens)])
+    | None => {
+        let tok =
+          tokens
+          ->Gid.Map.get(construct)
+          ->Or_error.fromOption_s("token data missing")
+          ->Or_error.flatMap(td => CSpace.tokenFromTokenData(construct, td))
+        let inputCons = links->Array.keepMap(l =>
+          if EdgeData.target(l) === construct {
+            Some(EdgeData.source(l))
+          } else {
+            None
+          }
+        )
+        // If there's no "inputs" to this token, we call it a source
+        if inputCons == [] {
+          let usedTokens =
+            tok
+            ->Or_error.map(tok => usedTokens->Gid.Map.set(construct, tok))
+            ->Or_error.getWithDefault(usedTokens)
+          tok->Or_error.map(tok => [(Source(tok), usedTokens)])
+        } else {
+          // Otherwise, for each possible constructor input...
+          inputCons
+          ->Array.map(cid => {
+            let cons =
+              constructors
+              ->Gid.Map.get(cid)
+              ->Option.flatMap(c => c.constructor)
+              ->Or_error.fromOption_s("constructor data missing")
+            (tok, cons)
+            ->Or_error.both
+            ->Or_error.flatMap(((tok, cons)) => {
+              let tc = {
+                token: tok,
+                constructor: cons,
+              }
+              // ... we find all input tokens...
+              let inputToks = links->Array.keepMap(l =>
+                if EdgeData.target(l) === cid {
+                  Some(EdgeData.source(l))
+                } else {
+                  None
+                }
+              )
+              // ... then recursively find all ways to make those
+              let rec buildConstructionsForTokens = (i, usedTokens, result) => {
+                if i === Array.length(inputToks) {
+                  [(Or_error.create(result), usedTokens)]
+                } else {
+                  let tokId = inputToks[i]->Option.getExn
+                  switch makeConstructions(tokId, usedTokens)->Or_error.match {
+                  | Or_error.Ok(options) =>
+                    options->Array.flatMap(((cons, usedTokens)) =>
+                      buildConstructionsForTokens(i + 1, usedTokens, result->Array.push(cons))
+                    )
+                  | Or_error.Err(e) => [(Or_error.error(e), usedTokens)]
+                  }
+                }
+              }
+              // We end up with all possible ways to build this constructor!
+              buildConstructionsForTokens(0, usedTokens, [])
+              ->Array.map(((inputConstructions, usedTokens)) =>
+                inputConstructions->Or_error.map(ic => (TCPair(tc, ic), usedTokens))
+              )
+              ->Or_error.allArray
+            })
+          })
+          // We then flatten all combinations of constructors and input tokens
+          ->Or_error.allArray
+          ->Or_error.map(Array.concatMany)
+        }
+      }
+    }
+  }
+
+  if constructs == [] {
+    Or_error.error_s("Structure graph has no constructs!")
+  } else {
+    constructs
+    ->Array.map(((id, _)) => makeConstructions(id, Gid.Map.empty()))
+    ->Or_error.allArray
+    ->Or_error.map(Array.concatMany)
+    ->Or_error.map(Array.map(_, fst))
+  }
+}
+
 let url = s => "core.construction." ++ s
 
 let size = Rpc_service.require(url("size"), construction_rpc, Int.t_rpc)
