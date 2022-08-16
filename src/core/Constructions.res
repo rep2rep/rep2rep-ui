@@ -103,12 +103,12 @@ let fromViewConstruction = c => {
             None
           }
         )
+        let usedTokens =
+          tok
+          ->Or_error.map(tok => usedTokens->Gid.Map.set(construct, tok))
+          ->Or_error.getWithDefault(usedTokens)
         // If there's no "inputs" to this token, we call it a source
         if inputCons == [] {
-          let usedTokens =
-            tok
-            ->Or_error.map(tok => usedTokens->Gid.Map.set(construct, tok))
-            ->Or_error.getWithDefault(usedTokens)
           tok->Or_error.map(tok => [(Source(tok), usedTokens)])
         } else {
           // Otherwise, for each possible constructor input...
