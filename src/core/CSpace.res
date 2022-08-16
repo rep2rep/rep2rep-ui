@@ -85,3 +85,8 @@ let constructorSignature = ((_, sig)) => sig
 let conSpecName = t => t.name
 let conSpecTypeSystem = t => t.typeSystem
 let conSpecConstructors = t => t.constructors
+
+let tokenFromTokenData = (id, td: TokenData.t) =>
+  Option.first([td.subtype->Option.map(Type.fromString), td.type_])
+  ->Or_error.fromOption_ss(["Token has no type! ", Gid.toString(id)])
+  ->Or_error.map(ty => (Gid.toString(id), ty))

@@ -25,3 +25,5 @@ let constructorSignature: constructor => ctyp
 let conSpecName: conSpec => string
 let conSpecTypeSystem: conSpec => string
 let conSpecConstructors: conSpec => FiniteSet.t<constructor>
+
+let tokenFromTokenData: (Gid.t, TokenData.t) => Or_error.t<token>
