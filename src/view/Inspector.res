@@ -33,12 +33,21 @@ module Label = {
 
 module Input = {
   @react.component
-  let make = (~name=?, ~value=?, ~onChange=?, ~style=ReactDOM.Style.make()) => {
+  let make = (~name=?, ~value=?, ~onChange=?, ~exclude=?, ~style=ReactDOM.Style.make()) => {
+    let onKeyPress = e => {
+      exclude->Option.iter(Js.Re.setLastIndex(_, 0))
+      let key = ReactEvent.Keyboard.key(e)
+      let shouldIgnore = exclude->Option.map(Js.Re.test_(_, key))->Option.getWithDefault(false)
+      if shouldIgnore {
+        e->ReactEvent.Keyboard.preventDefault
+      }
+    }
     <input
       type_="text"
       ?name
       ?value
       ?onChange
+      onKeyPress
       style={ReactDOM.Style.make(
         ~flexGrow="1",
         ~border="1px solid #777",
@@ -174,6 +183,7 @@ module Token = {
           <Input
             value={data.subtype->Option.getWithDefault("")}
             onChange={e => ReactEvent.Form.target(e)["value"]->Event.Token.Subtype->onChange}
+            exclude={%re("/[^a-zA-Z_]/gi")}
           />
         </Row>
       } else {
