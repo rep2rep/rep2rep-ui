@@ -87,6 +87,12 @@ let conSpecTypeSystem = t => t.typeSystem
 let conSpecConstructors = t => t.constructors
 
 let tokenFromTokenData = (id, td: TokenData.t) =>
-  Option.first([td.subtype->Option.map(Type.fromString), td.type_])
+  [td.subtype->Option.map(Type.fromString), td.type_]
+  ->Array.keepMap(o => o)
+  ->(ts =>
+    switch ts {
+    | [] => None
+    | _ => ts->Type.join->Some
+    })
   ->Or_error.fromOption_ss(["Token has no type! ", Gid.toString(id)])
   ->Or_error.map(ty => (Gid.toString(id), ty))

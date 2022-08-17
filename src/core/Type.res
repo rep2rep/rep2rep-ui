@@ -9,6 +9,7 @@ let name = t => t
 
 let any = ""
 let equal = (t, t') => t == t'
+let join = ts => ts->Array.joinWith(":")
 
 module PrincipalType = {
   type t = {

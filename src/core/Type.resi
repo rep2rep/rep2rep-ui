@@ -8,6 +8,7 @@ let name: typ => string
 
 let any: typ
 let equal: (typ, typ) => bool
+let join: array<typ> => typ
 
 module PrincipalType: {
   type t
