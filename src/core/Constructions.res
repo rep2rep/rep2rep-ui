@@ -98,7 +98,7 @@ let fromViewConstruction = c => {
           ->Or_error.flatMap(td => CSpace.tokenFromTokenData(construct, td))
         let inputCons = links->Array.keepMap(l =>
           if EdgeData.target(l) === construct {
-            Some(EdgeData.source(l))
+            Some((EdgeData.payload(l), EdgeData.source(l)))
           } else {
             None
           }
@@ -113,7 +113,7 @@ let fromViewConstruction = c => {
         } else {
           // Otherwise, for each possible constructor input...
           inputCons
-          ->Array.map(cid => {
+          ->Array.map(((payload, cid)) => {
             let cons =
               constructors
               ->Gid.Map.get(cid)
@@ -121,6 +121,13 @@ let fromViewConstruction = c => {
               ->Or_error.fromOption_s("constructor data missing")
             (tok, cons)
             ->Or_error.both
+            ->Or_error.flatMap(tc => {
+              if Option.isSome(payload) {
+                Or_error.error_s("Arrows from constructors should be unlabelled")
+              } else {
+                Or_error.create(tc)
+              }
+            })
             ->Or_error.flatMap(((tok, cons)) => {
               let tc = {
                 token: tok,

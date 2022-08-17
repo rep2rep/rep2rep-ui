@@ -230,6 +230,7 @@ module Edge = {
         <Label> {React.string("Label")} </Label>
         <input
           type_="number"
+          min="1"
           value={EdgeData.payload(data)->Option.map(Int.toString)->Option.getWithDefault("")}
           onChange={e =>
             ReactEvent.Form.target(e)["value"]->Int.fromString->Event.Edge.Value->onChange}
