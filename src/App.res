@@ -243,6 +243,7 @@ module App = {
         ~flexDirection="row",
         ~fontFamily="sans-serif",
         ~height="100%",
+        ~overflow="hidden",
         (),
       )}>
       <FP
@@ -274,6 +275,7 @@ module App = {
           ~display="flex",
           ~flexDirection="column",
           ~height="100%",
+          ~overflow="hidden",
           (),
         )}>
         <div
@@ -282,9 +284,10 @@ module App = {
             ~order="1",
             ~display="flex",
             ~alignItems="center",
-            ~height="40px",
+            ~minHeight="30px",
             ~borderBottom="1px solid black",
             ~padding="0 0.5rem",
+            ~overflowX="auto",
             (),
           )}>
           <Button onClick={undo} value="Undo" enabled={canUndo} tooltip="Cmd+Z" />
@@ -344,6 +347,7 @@ module App = {
           style={ReactDOM.Style.make(
             ~order="2",
             ~flexGrow="1",
+            ~overflow="hidden",
             ~display="flex",
             ~flexDirection="row",
             (),
