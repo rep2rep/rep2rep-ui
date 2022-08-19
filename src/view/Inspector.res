@@ -166,11 +166,10 @@ module TypeContext = {
     while leaves != [] {
       let focus = leaves->Js.Array2.shift->Option.getExn
       result->Js.Array2.push(focus)->ignore
-      let (outgoing, other) =
-        arrows.contents->Array.partition(((sub, sup)) => Type.equal(sub, focus))
+      let (outgoing, other) = arrows.contents->Array.partition(((sub, _)) => Type.equal(sub, focus))
       arrows := other
       outgoing->Array.forEach(((_, target)) =>
-        if other->Array.some(((sub, sup)) => Type.equal(target, sup))->not {
+        if other->Array.some(((_, sup)) => Type.equal(target, sup))->not {
           leaves->Js.Array2.push(target)->ignore
         }
       )
@@ -249,7 +248,7 @@ module TypeContext = {
     let min_x =
       pos
       ->String.Map.valuesToArray
-      ->Array.map(((x, y, dx)) => x -. dx /. 2.)
+      ->Array.map(((x, _, dx)) => x -. dx /. 2.)
       ->Array.reduce(0., Float.min)
     let width = min_x *. -2. +. 2. *. margin
     let height = Int.toFloat(n_layers) *. (layer_height +. v_padding) -. v_padding +. 2. *. margin
