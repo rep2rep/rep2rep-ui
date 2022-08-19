@@ -227,7 +227,7 @@ module TypeContext = {
     let margin = 10.
     let v_padding = 25.
     let layer_height = 12.
-    let h_padding = 10.
+    let h_padding = 15.
     let em_factor = 10.
     let pos =
       layers
