@@ -383,26 +383,28 @@ module App = {
                 ) {
                 | ([node], []) =>
                   switch construction->State.Construction.getNode(node) {
-                  | Some(#token(data)) =>
-                    Inspector.Data.Token(
-                      data,
-                      construction
-                      ->State.Construction.space
-                      ->Option.flatMap(space => {
-                        let typeSystemName = CSpace.conSpecTypeSystem(space)
-                        state
-                        ->State.typeSystems
-                        ->String.Map.get(typeSystemName)
-                        ->Option.map(pts =>
-                          pts
-                          ->FiniteSet.toArray
-                          ->Array.map(p => (p->Type.PrincipalType.type_->Type.name, p))
-                          ->String.Map.fromArray
-                        )
-                      })
-                      ->Option.getWithDefault(String.Map.empty),
-                      node,
-                    )->Some
+                  | Some(#token(data)) => {
+                      let space = construction->State.Construction.space
+                      Inspector.Data.Token(
+                        data,
+                        space
+                        ->Option.flatMap(space => {
+                          let typeSystemName = CSpace.conSpecTypeSystem(space)
+                          state
+                          ->State.typeSystems
+                          ->String.Map.get(typeSystemName)
+                          ->Option.map(pts =>
+                            pts
+                            ->FiniteSet.toArray
+                            ->Array.map(p => (p->Type.PrincipalType.type_->Type.name, p))
+                            ->String.Map.fromArray
+                          )
+                        })
+                        ->Option.getWithDefault(String.Map.empty),
+                        space->Option.map(CSpace.conSpecTypeSystem)->Option.getWithDefault(""),
+                        node,
+                      )->Some
+                    }
                   | Some(#constructor(data)) =>
                     Inspector.Data.Constructor(
                       data,
