@@ -308,22 +308,23 @@ module TypeContext = {
 
   @react.component
   let make = (~arrows, ~principalType, ~subtype=?) => {
+    let principalType = principalType->Type.PrincipalType.type_
     let arrows =
       subtype
-      ->Option.map(subtype =>
-        arrows->Array.push((Type.fromString(subtype), principalType->Type.PrincipalType.type_))
-      )
+      ->Option.map(subtype => arrows->Array.push((Type.fromString(subtype), principalType)))
       ->Option.getWithDefault(arrows)
-    let allTypes = toposort(arrows)
-    if allTypes->Array.includes(principalType->Type.PrincipalType.type_)->not {
+    let allTypes = if arrows == [] {
+      // If there are no arrows, then there's no subtype either!
+      [principalType]
+    } else {
+      toposort(arrows)
+    }
+    if allTypes->Array.includes(principalType)->not {
       React.null
     } else {
       let layers = groupByLayers(allTypes, arrows)
       let (width, height, positions) = positionTypeLabels(layers)
-      let labels = makeLabels(
-        positions,
-        subtype->Option.getWithDefault(principalType->Type.PrincipalType.type_->Type.name),
-      )
+      let labels = makeLabels(positions, subtype->Option.getWithDefault(principalType->Type.name))
       let arrowMarks = makeArrows(positions, arrows)
       <svg
         width={Float.toString(width)}
