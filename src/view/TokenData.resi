@@ -14,6 +14,7 @@ let create: (
   string,
 ) => t
 let duplicate: t => t
+let hash: t => Hash.t
 
 let size: t => {"width": float, "height": float}
 let render: t => React.element

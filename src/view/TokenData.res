@@ -77,6 +77,14 @@ let duplicate = t => {
   notes: t.notes,
 }
 
+let hash: t => Hash.t = Hash.record5(
+  ("label", String.hash),
+  ("payload", Option.hash(_, String.hash)),
+  ("type_", ty => ty->Option.map(Type.name)->Option.hash(String.hash)),
+  ("subtype", Option.hash(_, String.hash)),
+  ("notes", String.hash),
+)
+
 // Perhaps we can dispatch these off to a "plugin"? E.g, if we know the RS, we send [t] to
 // a plugin which has said "I am a renderer for this RS", and get back a React component and a size.
 let size = t =>
