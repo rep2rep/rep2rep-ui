@@ -417,6 +417,169 @@ module Token = {
   }
 }
 
+module ConstructorSpecification = {
+  let layoutInputs = intypes => {
+    let h_padding = 20.
+    let em_factor = 10.
+    let intypes = intypes->Array.map(Type.name)
+    let width =
+      intypes->Array.reduce(-1. *. h_padding, (tot, ty) =>
+        tot +. h_padding +. ty->String.approximateEmWidth *. em_factor
+      )
+    let consumed_width = ref(0.)
+    intypes
+    ->Array.map(ty => {
+      let dx = ty->String.approximateEmWidth *. em_factor
+      let x = consumed_width.contents -. width /. 2. +. dx /. 2.
+      consumed_width := consumed_width.contents +. h_padding +. dx
+      x
+    })
+    ->(xs => (width, xs))
+  }
+
+  let layoutConstructor = name => {
+    let em_factor = 10.
+    let offset = 10.
+    let width = name->String.approximateEmWidth *. em_factor
+    (2. *. (width +. offset), offset)
+  }
+
+  let makeInputTypeNodes = (width, y, typesWithX) => {
+    typesWithX->Array.mapWithIndex((i, (ty, x)) => {
+      <text
+        key={Type.name(ty) ++ Int.toString(i)}
+        textAnchor="middle"
+        x={Float.toString(x +. width /. 2.)}
+        y={Float.toString(y)}
+        fontSize="12"
+        fill={"#888"}>
+        {React.string(Type.name(ty))}
+      </text>
+    })
+  }
+
+  let makeOutputTypeNode = (width, y, ty) => {
+    <text
+      textAnchor="middle"
+      x={Float.toString(width /. 2.)}
+      y={Float.toString(y)}
+      fontSize="12"
+      fill={"#888"}>
+      {React.string(Type.name(ty))}
+    </text>
+  }
+
+  let makeConstructorNode = (width, y, name, offset) => {
+    <>
+      <circle
+        cx={Float.toString(width /. 2.)}
+        cy={Float.toString(y)}
+        fill="white"
+        r="5"
+        stroke="black"
+        strokeWidth="1"
+      />
+      <text
+        fontSize="12"
+        textAnchor="left"
+        x={Float.toString(width /. 2. +. offset)}
+        y={Float.toString(y +. 4.)}>
+        {React.string(name)}
+      </text>
+    </>
+  }
+
+  let makeArrows = (width, in_xs, in_y, out_y, constructor_y) => {
+    let shift_up = 15.
+    let shift_down = 5.
+    let result = in_xs->Array.mapWithIndex((i, x) => {
+      let i = i + 1
+      <g key={Float.toString(x)}>
+        <path
+          d={[
+            "M " ++ Float.toString(width /. 2. +. x) ++ " " ++ Float.toString(in_y -. shift_up),
+            "L " ++ Float.toString(width /. 2.) ++ " " ++ Float.toString(constructor_y),
+          ]->Js.Array2.joinWith(" ")}
+          stroke="black"
+          strokeLinecap="round"
+          fill="transparent"
+          markerEnd="url(#sigArr1)"
+        />
+        <svg
+          x={Float.toString((width +. x) /. 2. -. 5.)}
+          y={Float.toString((in_y -. shift_up +. constructor_y) /. 2. -. 5.)}>
+          <circle r="5" cx="5" cy="5" fill="white" />
+          <text textAnchor="middle" x="5" y="8.5" fontSize="9">
+            {React.string(Int.toString(i))}
+          </text>
+        </svg>
+      </g>
+    })
+    result
+    ->Js.Array2.push({
+      <path
+        key="out"
+        d={"M " ++
+        Float.toString(width /. 2.) ++
+        " " ++
+        Float.toString(constructor_y) ++
+        " L " ++
+        Float.toString(width /. 2.) ++
+        " " ++
+        Float.toString(out_y +. shift_down)}
+        stroke="black"
+        strokeLinecap="round"
+        fill="transparent"
+        markerEnd="url(#sigArr2)"
+      />
+    })
+    ->ignore
+    result
+  }
+
+  let defs = [
+    <marker
+      key="sigArr1" id="sigArr1" markerWidth="6" markerHeight="6" refX="11" refY="3" orient="auto">
+      <path d="M1 1 L5 3 L1 5 Z" fill="black" strokeWidth="1" stroke="#000" />
+    </marker>,
+    <marker
+      key="sigArr2" id="sigArr2" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+      <path d="M1 1 L5 3 L1 5 Z" fill="black" strokeWidth="1" stroke="#000" />
+    </marker>,
+  ]
+
+  @react.component
+  let make = (~name, ~signature) => {
+    let padding = 10.
+    let em_factor = 10.
+    let out_y = 10. +. padding
+    let constructor_y = 50. +. padding
+    let in_y = 110. +. padding
+    let (intypes, outtype) = signature
+    // Calculate widths and x-coordinates assume a zero centre
+    let (w1, intypePositions) = layoutInputs(intypes)
+    let w2 = outtype->Type.name->String.approximateEmWidth *. em_factor
+    let (w3, constructorPosition) = layoutConstructor(name)
+    // The needed width is the largest
+    let width = [w1, w2, w3]->Array.reduce(0., Float.max) +. 2. *. padding
+    // Using the positions and widths, let's layout the types
+    let intypeNodes = makeInputTypeNodes(width, in_y, Array.zip(intypes, intypePositions))
+    let outtypeNode = makeOutputTypeNode(width, out_y, outtype)
+    let constructorNode = makeConstructorNode(width, constructor_y, name, constructorPosition)
+    let arrows = makeArrows(width, intypePositions, in_y, out_y, constructor_y)
+    <svg
+      width={Float.toString(width)}
+      height={Float.toString(in_y +. 2. *. padding)}
+      style={ReactDOM.Style.make(~margin="2rem auto 0 auto", ())}>
+      <defs> {React.array(defs)} </defs>
+      {React.array(arrows)}
+      {React.array(intypeNodes)}
+      {outtypeNode}
+      {constructorNode}
+    </svg>
+  }
+}
+
 module Constructor = {
   @react.component
   let make = (~data: ConstructorData.t, ~constructors, ~onChange) => {
@@ -437,6 +600,14 @@ module Constructor = {
         value={data.notes}
         onChange={e => ReactEvent.Form.target(e)["value"]->Event.Constructor.Notes->onChange}
       />
+      {data.constructor
+      ->Option.map(constructor =>
+        <ConstructorSpecification
+          name={constructor->CSpace.constructorName}
+          signature={constructor->CSpace.constructorSignature}
+        />
+      )
+      ->Option.getWithDefault(React.null)}
     </>
   }
 }
