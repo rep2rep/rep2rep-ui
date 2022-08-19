@@ -10,6 +10,8 @@ let any: typ
 let equal: (typ, typ) => bool
 let join: array<typ> => typ
 
+let context: (typ, ~typeSystem: string) => Rpc.Response.t<array<(typ, typ)>>
+
 module PrincipalType: {
   type t
   let t_rpc: Rpc.Datatype.t<t>

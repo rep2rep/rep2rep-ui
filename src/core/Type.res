@@ -11,6 +11,13 @@ let any = ""
 let equal = (t, t') => t == t'
 let join = ts => ts->Array.joinWith(":")
 
+let context_ = Rpc_service.require(
+  "server.getTypeContext",
+  Rpc.Datatype.tuple2_(String.t_rpc, typ_rpc),
+  Array.t_rpc(Rpc.Datatype.tuple2_(typ_rpc, typ_rpc)),
+)
+let context = (t, ~typeSystem) => context_((typeSystem, t))
+
 module PrincipalType = {
   type t = {
     typ: typ,
