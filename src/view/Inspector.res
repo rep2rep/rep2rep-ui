@@ -383,7 +383,17 @@ module Token = {
           <Label> {React.string("SubType")} </Label>
           <Input
             value={data.subtype->Option.getWithDefault("")}
-            onChange={e => ReactEvent.Form.target(e)["value"]->Event.Token.Subtype->onChange}
+            onChange={e =>
+              ReactEvent.Form.target(e)["value"]
+              ->Option.flatMap(v =>
+                if v === "" {
+                  None
+                } else {
+                  Some(v)
+                }
+              )
+              ->Event.Token.Subtype
+              ->onChange}
             exclude={%re("/[^a-zA-Z_]/gi")}
           />
         </Row>
