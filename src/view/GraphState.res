@@ -367,7 +367,7 @@ module Selection = {
 
   let nodes = t => t.nodes
   let links = t => t.links
-  let singleNode = node => {nodes: [node], links: []}
+  let ofNodes = nodes => {nodes: nodes, links: []}
   let toReactD3Selection = t => {
     ReactD3Graph.Graph.Selection.nodes: t.nodes->Array.map(fromGid),
     links: t.links->Array.map(id => id->Gid.toString->ReactD3Graph.Link.Id.ofString),

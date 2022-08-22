@@ -201,7 +201,7 @@ module App = {
           }
         })
       }
-      dispatchC(Event.Construction.ChangeSelection(GraphState.Selection.singleNode(tok)))
+      dispatchC(Event.Construction.ChangeSelection(GraphState.Selection.ofNodes([tok])))
     }
 
     let addConstructorNodeAt = (_, ~x, ~y, ~reversed) => {
@@ -244,7 +244,7 @@ module App = {
           }
         })
       }
-      dispatchC(Event.Construction.ChangeSelection(GraphState.Selection.singleNode(cons)))
+      dispatchC(Event.Construction.ChangeSelection(GraphState.Selection.ofNodes([cons])))
     }
 
     let connectNodes = (_, ~reversed) =>
@@ -339,8 +339,10 @@ module App = {
             let high_y = y -. y_space
             let low_y = y +. y_space
             let width = Int.toFloat(n - 1) *. x_space
+            let nodes = [cons, out]
             let e_in = Array.range(1, n)->Array.flatMap(i => {
               let tok = Gid.create()
+              nodes->Js.Array2.push(tok)->ignore
               let arr = Gid.create()
               let new_x = Int.toFloat(i - 1) *. x_space +. x -. width /. 2.
               [
@@ -354,7 +356,9 @@ module App = {
                 Event.Construction.AddConstructor(cons, x +. 5., y),
                 Event.Construction.AddToken(out, x, high_y),
                 Event.Construction.ConnectNodes(Gid.create(), cons, out),
-              ]->Array.concat(e_in)
+              ]
+              ->Array.concat(e_in)
+              ->Array.push(Event.Construction.ChangeSelection(GraphState.Selection.ofNodes(nodes)))
             dispatchC(Event.Construction.Multiple(es))
           }
         | [node] =>
@@ -368,6 +372,7 @@ module App = {
               let es = [
                 Event.Construction.AddConstructor(cons, x, y),
                 Event.Construction.ConnectNodes(arr, cons, node),
+                Event.Construction.ChangeSelection(GraphState.Selection.ofNodes([cons])),
               ]
               dispatchC(Event.Construction.Multiple(es))
             } else {
@@ -378,6 +383,7 @@ module App = {
                 Event.Construction.AddConstructor(cons, x, y),
                 Event.Construction.ConnectNodes(arr, node, cons),
                 Event.Construction.UpdateEdge(arr, Event.Edge.Value(Some(n))),
+                Event.Construction.ChangeSelection(GraphState.Selection.ofNodes([cons])),
               ]
               dispatchC(Event.Construction.Multiple(es))
             }
@@ -389,6 +395,7 @@ module App = {
               let es = [
                 Event.Construction.AddToken(tok, x, y),
                 Event.Construction.ConnectNodes(arr, node, tok),
+                Event.Construction.ChangeSelection(GraphState.Selection.ofNodes([tok])),
               ]
               dispatchC(Event.Construction.Multiple(es))
             } else {
@@ -399,6 +406,7 @@ module App = {
                 Event.Construction.AddToken(tok, x, y),
                 Event.Construction.ConnectNodes(arr, tok, node),
                 Event.Construction.UpdateEdge(arr, Event.Edge.Value(Some(n))),
+                Event.Construction.ChangeSelection(GraphState.Selection.ofNodes([tok])),
               ]
               dispatchC(Event.Construction.Multiple(es))
             }
