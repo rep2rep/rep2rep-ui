@@ -256,30 +256,18 @@ module App = {
             // [a, b, ..., b]
             // [a, ..., a, b]
             // [a, b]
+            // (Note that order doesn't matter, except for determining the direction)
             switch nodes {
             | [] | [_] => ([], []) // Previously eliminated, but safer this way!
             | [source, target] => ([source], [target])
             | _ => {
+                let (toks, cons) = nodes->Array.partition(v => kind(v) === Some(#token))
                 let k1 = nodes[0]->Option.flatMap(kind)
-                let k2 = nodes[1]->Option.flatMap(kind)
-                let kn = nodes[Array.length(nodes) - 1]->Option.flatMap(kind)
-                (k1, k2, kn)
-                ->Option.both3
-                ->Option.flatMap(((k1, k2, kn)) => {
-                  let first = nodes[0]->Option.getExn // Safe!
-                  let rest = nodes->Array.sliceToEnd(1)
-                  let (last, all_but_last) = nodes->Array.pop
-                  if k1 !== k2 && k2 === kn && rest->Array.every(v => kind(v) === Some(k2)) {
-                    Some(([first], rest))
-                  } else if (
-                    k1 == k2 && k2 !== kn && all_but_last->Array.every(v => kind(v) === Some(k1))
-                  ) {
-                    Some(all_but_last, [last])
-                  } else {
-                    None
-                  }
-                })
-                ->Option.getWithDefault(([], []))
+                if k1 === Some(#token) {
+                  (toks, cons)
+                } else {
+                  (cons, toks)
+                }
               }
             }
           }
@@ -301,6 +289,8 @@ module App = {
               )
               dispatchC(Event.Construction.Multiple(es))
             } else {
+              // If the source is a constructor, it can only have one output!
+              // However, showing no edges would be confusing, so we add them all anyway...
               let es = sources->Array.flatMap(source =>
                 targets->Array.map(target => {
                   Event.Construction.ConnectNodes(Gid.create(), source, target)
