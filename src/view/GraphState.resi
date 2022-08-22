@@ -33,6 +33,7 @@ module Selection: {
   let empty: t
   let nodes: t => array<Gid.t>
   let links: t => array<Gid.t>
+  let singleNode: Gid.t => t
   let toReactD3Selection: t => ReactD3Graph.Graph.Selection.t
   let fromReactD3Selection: ReactD3Graph.Graph.Selection.t => t
 }

@@ -151,13 +151,73 @@ module App = {
     let redo = _ => focused->Option.iter(focused => dispatch(Event.Redo(focused)))
 
     let toolbarActive = focused->Option.isSome
-    let addTokenNodeAt = (_, ~x, ~y) => dispatchC(Event.Construction.AddToken(Gid.create(), x, y))
-    let addConstructorNodeAt = (_, ~x, ~y) =>
-      dispatchC(Event.Construction.AddConstructor(Gid.create(), x, y))
+    let addTokenNodeAt = (_, ~x, ~y) => {
+      let tok = Gid.create()
+      switch GraphState.Selection.nodes(selection) {
+      | [] => dispatchC(Event.Construction.AddToken(tok, x, y))
+      | inputs =>
+        focused
+        ->Option.flatMap(State.construction(state, _))
+        ->Option.iter(construction => {
+          let kind = vert =>
+            construction
+            ->State.Construction.getNode(vert)
+            ->Option.map(v =>
+              switch v {
+              | #token(_) => #token
+              | #constructor(_) => #constructor
+              }
+            )
+          if inputs->Array.every(i => kind(i) === Some(#constructor)) {
+            let e0 = Event.Construction.AddToken(tok, x, y)
+            let es = inputs->Array.mapWithIndex((i, cons) => {
+              let arrowId = Gid.create()
+              Event.Construction.ConnectNodes(arrowId, cons, tok)
+            })
+            dispatchC(Event.Construction.Multiple(Array.concat([e0], es)))
+          } else {
+            dispatchC(Event.Construction.AddToken(tok, x, y))
+          }
+        })
+      }
+      dispatchC(Event.Construction.ChangeSelection(GraphState.Selection.singleNode(tok)))
+    }
+    let addConstructorNodeAt = (_, ~x, ~y) => {
+      let cons = Gid.create()
+      switch GraphState.Selection.nodes(selection) {
+      | [] => dispatchC(Event.Construction.AddConstructor(cons, x, y))
+      | inputs =>
+        focused
+        ->Option.flatMap(State.construction(state, _))
+        ->Option.iter(construction => {
+          let kind = vert =>
+            construction
+            ->State.Construction.getNode(vert)
+            ->Option.map(v =>
+              switch v {
+              | #token(_) => #token
+              | #constructor(_) => #constructor
+              }
+            )
+          if inputs->Array.every(i => kind(i) === Some(#token)) {
+            let e0 = Event.Construction.AddConstructor(cons, x, y)
+            let es = inputs->Array.flatMapWithIndex((i, tok) => {
+              let arrowId = Gid.create()
+              let addArr = Event.Construction.ConnectNodes(arrowId, tok, cons)
+              let numberArr = Event.Construction.UpdateEdge(arrowId, Event.Edge.Value(Some(i + 1)))
+              [addArr, numberArr]
+            })
+            dispatchC(Event.Construction.Multiple(Array.concat([e0], es)))
+          } else {
+            dispatchC(Event.Construction.AddConstructor(cons, x, y))
+          }
+        })
+      }
+      dispatchC(Event.Construction.ChangeSelection(GraphState.Selection.singleNode(cons)))
+    }
     // let duplicateNodes = _ => Js.Console.log("Duplicate Nodes!")
     let connectNodes = _ =>
       switch GraphState.Selection.nodes(selection) {
-      | [self] => dispatchC(Event.Construction.ConnectNodes(Gid.create(), self, self))
       | [source, target] =>
         focused
         ->Option.flatMap(State.construction(state, _))

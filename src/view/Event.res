@@ -51,7 +51,8 @@ module Construction = {
       }
   }
 
-  type t =
+  type rec t =
+    | Multiple(array<t>)
     | SetSpace(option<string>)
     | AddToken(Gid.t, float, float)
     | AddConstructor(Gid.t, float, float)
@@ -66,8 +67,9 @@ module Construction = {
     | UpdateConstructor(Gid.t, Constructor.t)
     | UpdateEdge(Gid.t, Edge.t)
 
-  let dispatch = (construction, t) =>
+  let rec dispatch = (construction, t) =>
     switch t {
+    | Multiple(ts) => ts->Array.reduce(construction, dispatch)
     | SetSpace(space) => construction->State.Construction.setSpace(space)
     | AddToken(id, x, y) => construction->State.Construction.addToken(id, ~x, ~y)
     | AddConstructor(id, x, y) => construction->State.Construction.addConstructor(id, ~x, ~y)
