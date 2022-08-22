@@ -251,9 +251,12 @@ module App = {
         ->Option.iter(Array.forEach(_, linkId => dispatchC(Event.Construction.DeleteLink(linkId))))
         dispatchC(Event.Construction.DeleteNode(nodeId))
       })
-      selection
-      ->GraphState.Selection.links
-      ->Array.forEach(linkId => dispatchC(Event.Construction.DeleteLink(linkId)))
+      let es =
+        selection
+        ->GraphState.Selection.links
+        ->Array.map(linkId => Event.Construction.DeleteLink(linkId))
+      let unselect = Event.Construction.ChangeSelection(GraphState.Selection.empty)
+      dispatchC(Event.Construction.Multiple(Array.concat(es, [unselect])))
     }
     let movedNode = (id, ~x, ~y) =>
       dispatchC(
