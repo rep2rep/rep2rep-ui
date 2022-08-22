@@ -67,18 +67,7 @@ module App = {
     })
 
     let focused = state->State.focused
-    focused->Option.iter(focused =>
-      state
-      ->State.construction(focused)
-      ->Option.iter(construction => {
-        let constructions = construction->Constructions.fromViewConstruction
-        switch constructions->Or_error.match {
-        | Or_error.Ok(cs) =>
-          cs->Array.forEach(c => c->Constructions.toOrugaString->Rpc.Response.upon(Js.Console.log))
-        | Or_error.Err(e) => e->Error.toString->Js.Console.log
-        }
-      })
-    )
+
     let selection =
       focused
       ->Option.flatMap(state->State.construction(_))
