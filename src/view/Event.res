@@ -52,7 +52,7 @@ module Construction = {
   }
 
   type t =
-    | SetSpace(option<CSpace.conSpec>)
+    | SetSpace(option<string>)
     | AddToken(Gid.t, float, float)
     | AddConstructor(Gid.t, float, float)
     | DuplicateNode(Gid.t, Gid.t)

@@ -15,12 +15,12 @@ module Construction: {
   let tokens: t => array<Gid.t>
   let constructors: t => array<Gid.t>
   let links: t => array<Gid.t>
-  let space: t => option<CSpace.conSpec>
+  let space: t => option<string> // The space _name_
 
   let isEmpty: t => bool
 
   let updateMetadata: (t, Metadata.t => Metadata.t) => t
-  let setSpace: (t, option<CSpace.conSpec>) => t
+  let setSpace: (t, option<string>) => t
   let addToken: (t, Gid.t, ~x: float, ~y: float) => t
   let addConstructor: (t, Gid.t, ~x: float, ~y: float) => t
   let updateToken: (t, Gid.t, TokenData.t => TokenData.t) => t
@@ -51,6 +51,7 @@ let focused: t => option<Gid.t>
 let constructions: t => FileTree.t<(Gid.t, Construction.t)>
 let construction: (t, Gid.t) => option<Construction.t>
 let spaces: t => String.Map.t<CSpace.conSpec>
+let getSpace: (t, string) => option<CSpace.conSpec>
 let typeSystems: t => String.Map.t<FiniteSet.t<Type.PrincipalType.t>>
 
 let loadSpaces: t => Rpc.Response.t<t>

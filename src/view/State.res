@@ -62,7 +62,7 @@ module Construction = {
 
   type t = {
     metadata: Metadata.t,
-    space: option<CSpace.conSpec>,
+    space: option<string>,
     tokenData: Gid.Map.t<TokenData.t>,
     constructorData: Gid.Map.t<ConstructorData.t>,
     edgeData: Gid.Map.t<EdgeData.t>,
@@ -73,7 +73,7 @@ module Construction = {
     module V1 = {
       type t = t = {
         metadata: Metadata.Stable.V1.t,
-        space: option<CSpace.conSpec>,
+        space: option<string>,
         tokenData: Gid.Map.t<TokenData.Stable.V1.t>,
         constructorData: Gid.Map.t<ConstructorData.Stable.V1.t>,
         edgeData: Gid.Map.t<EdgeData.Stable.V1.t>,
@@ -84,7 +84,7 @@ module Construction = {
         Js.Dict.fromArray([
           ("version", 1->Int.toJson),
           ("metadata", t.metadata->Metadata.Stable.V1.toJson),
-          ("space", t.space->Option.toJson(CSpace.conSpec_toJson)),
+          ("space", t.space->Option.toJson(String.toJson)),
           ("tokenData", t.tokenData->Gid.Map.toJson(TokenData.Stable.V1.toJson)),
           ("constructorData", t.constructorData->Gid.Map.toJson(ConstructorData.Stable.V1.toJson)),
           ("edgeData", t.edgeData->Gid.Map.toJson(EdgeData.Stable.V1.toJson)),
@@ -105,7 +105,7 @@ module Construction = {
           switch version->Or_error.match {
           | Or_error.Ok(1) => {
               let metadata = getValue("metadata", Metadata.Stable.V1.fromJson)
-              let space = getValue("space", Option.fromJson(_, CSpace.conSpec_fromJson))
+              let space = getValue("space", Option.fromJson(_, String.fromJson))
               let tokenData = getValue(
                 "tokenData",
                 Gid.Map.fromJson(_, TokenData.Stable.V1.fromJson),
@@ -381,6 +381,7 @@ let constructions = t =>
 let construction = (t, id) => t.constructions->Gid.Map.get(id)->Option.map(UndoRedo.state)
 let spaces = t => t.spaces
 let typeSystems = t => t.typeSystems
+let getSpace = (t, name) => t.spaces->String.Map.get(name)
 
 let getAvailableSpaces: unit => Rpc.Response.t<array<CSpace.conSpec>> = Rpc_service.require(
   "server.spaces",

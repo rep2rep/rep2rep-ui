@@ -298,13 +298,18 @@ module App = {
           </label>
           <Inspector.Selector
             name="space-selector"
-            options={String.Map.valuesToArray(State.spaces(state))}
+            options={String.Map.keysToArray(State.spaces(state))}
             current={focused
             ->Option.flatMap(state->State.construction(_))
             ->Option.flatMap(State.Construction.space)}
-            toString={space => space->CSpace.conSpecName}
-            fromString={spaceName => state->State.spaces->String.Map.get(spaceName)}
-            onChange={e => Event.Construction.SetSpace(e)->dispatchC}
+            toString={space => space}
+            fromString={space =>
+              if State.spaces(state)->String.Map.has(space) {
+                Some(space)
+              } else {
+                None
+              }}
+            onChange={s => Event.Construction.SetSpace(s)->dispatchC}
             enabled={focused
             ->Option.flatMap(state->State.construction(_))
             ->Option.map(State.Construction.isEmpty)
@@ -384,7 +389,10 @@ module App = {
                 | ([node], []) =>
                   switch construction->State.Construction.getNode(node) {
                   | Some(#token(data)) => {
-                      let space = construction->State.Construction.space
+                      let space =
+                        construction
+                        ->State.Construction.space
+                        ->Option.flatMap(State.getSpace(state, _))
                       Inspector.Data.Token(
                         data,
                         space
@@ -410,6 +418,7 @@ module App = {
                       data,
                       construction
                       ->State.Construction.space
+                      ->Option.flatMap(State.getSpace(state, _))
                       ->Option.map(space =>
                         space
                         ->CSpace.conSpecConstructors
