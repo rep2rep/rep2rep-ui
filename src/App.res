@@ -280,6 +280,7 @@ module App = {
       ("t", addTokenNodeAt),
       ("c", addConstructorNodeAt),
       ("e", (e, ~x as _, ~y as _) => connectNodes(e)),
+      ("a", (e, ~x as _, ~y as _) => connectNodes(e)),
       ("x", (e, ~x as _, ~y as _) => deleteSelection(e)),
       ("Backspace", (e, ~x as _, ~y as _) => deleteSelection(e)),
       ("Delete", (e, ~x as _, ~y as _) => deleteSelection(e)),
