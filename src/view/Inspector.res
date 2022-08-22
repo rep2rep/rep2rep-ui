@@ -301,9 +301,19 @@ module TypeContext = {
         y2={Float.toString(y2)}
         stroke="#888"
         strokeLinecap="round"
+        markerEnd="url(#typeArr)"
       />
     })
   }
+
+  let defs = [
+    <marker
+      key="sigArr1" id="typeArr" markerWidth="6" markerHeight="6" refX="4" refY="3" orient="auto">
+      <path
+        d="M1 1 L5 3 L1 5" fill="transparent" strokeWidth="1" stroke="#888" strokeLinecap="round"
+      />
+    </marker>,
+  ]
 
   @react.component
   let make = (~arrows, ~principalType, ~subtype=?) => {
@@ -329,7 +339,7 @@ module TypeContext = {
         width={Float.toString(width)}
         height={Float.toString(height)}
         style={ReactDOM.Style.make(~margin="2rem auto 0 auto", ())}>
-        {React.array(labels)} {React.array(arrowMarks)}
+        <defs> {React.array(defs)} </defs> {React.array(labels)} {React.array(arrowMarks)}
       </svg>
     }
   }
