@@ -151,7 +151,7 @@ module App = {
     let redo = _ => focused->Option.iter(focused => dispatch(Event.Redo(focused)))
 
     let toolbarActive = focused->Option.isSome
-    let addTokenNodeAt = (_, ~x, ~y) => {
+    let addTokenNodeAt = (_, ~x, ~y, ~reversed) => {
       let tok = Gid.create()
       switch GraphState.Selection.nodes(selection) {
       | [] => dispatchC(Event.Construction.AddToken(tok, x, y))
@@ -170,10 +170,18 @@ module App = {
             )
           if inputs->Array.every(i => kind(i) === Some(#constructor)) {
             let e0 = Event.Construction.AddToken(tok, x, y)
-            let es = inputs->Array.mapWithIndex((i, cons) => {
-              let arrowId = Gid.create()
-              Event.Construction.ConnectNodes(arrowId, cons, tok)
-            })
+            let es = if reversed {
+              inputs->Array.flatMapWithIndex((i, cons) => {
+                let arrowId = Gid.create()
+                let mkArr = Event.Construction.ConnectNodes(arrowId, tok, cons)
+                let labelArr = Event.Construction.UpdateEdge(arrowId, Event.Edge.Value(Some(i + 1)))
+                [mkArr, labelArr]
+              })
+            } else {
+              inputs->Array.map(cons => {
+                Event.Construction.ConnectNodes(Gid.create(), cons, tok)
+              })
+            }
             dispatchC(Event.Construction.Multiple(Array.concat([e0], es)))
           } else {
             dispatchC(Event.Construction.AddToken(tok, x, y))
@@ -182,7 +190,7 @@ module App = {
       }
       dispatchC(Event.Construction.ChangeSelection(GraphState.Selection.singleNode(tok)))
     }
-    let addConstructorNodeAt = (_, ~x, ~y) => {
+    let addConstructorNodeAt = (_, ~x, ~y, ~reversed) => {
       let cons = Gid.create()
       switch GraphState.Selection.nodes(selection) {
       | [] => dispatchC(Event.Construction.AddConstructor(cons, x, y))
@@ -201,12 +209,21 @@ module App = {
             )
           if inputs->Array.every(i => kind(i) === Some(#token)) {
             let e0 = Event.Construction.AddConstructor(cons, x, y)
-            let es = inputs->Array.flatMapWithIndex((i, tok) => {
-              let arrowId = Gid.create()
-              let addArr = Event.Construction.ConnectNodes(arrowId, tok, cons)
-              let numberArr = Event.Construction.UpdateEdge(arrowId, Event.Edge.Value(Some(i + 1)))
-              [addArr, numberArr]
-            })
+            let es = if reversed {
+              inputs->Array.map(tok => {
+                Event.Construction.ConnectNodes(Gid.create(), cons, tok)
+              })
+            } else {
+              inputs->Array.flatMapWithIndex((i, tok) => {
+                let arrowId = Gid.create()
+                let addArr = Event.Construction.ConnectNodes(arrowId, tok, cons)
+                let numberArr = Event.Construction.UpdateEdge(
+                  arrowId,
+                  Event.Edge.Value(Some(i + 1)),
+                )
+                [addArr, numberArr]
+              })
+            }
             dispatchC(Event.Construction.Multiple(Array.concat([e0], es)))
           } else {
             dispatchC(Event.Construction.AddConstructor(cons, x, y))
@@ -216,7 +233,7 @@ module App = {
       dispatchC(Event.Construction.ChangeSelection(GraphState.Selection.singleNode(cons)))
     }
     // let duplicateNodes = _ => Js.Console.log("Duplicate Nodes!")
-    let connectNodes = _ =>
+    let connectNodes = (_, ~reversed) =>
       switch GraphState.Selection.nodes(selection) {
       | [source, target] =>
         focused
@@ -231,10 +248,22 @@ module App = {
               | #constructor(_) => #constructor
               }
             )
+          let (source, target) = if reversed {
+            (target, source)
+          } else {
+            (source, target)
+          }
           let s = kind(source)
           let t = kind(target)
           if Option.isSome(s) && Option.isSome(t) && Option.getExn(s) !== Option.getExn(t) {
-            dispatchC(Event.Construction.ConnectNodes(Gid.create(), source, target))
+            if s === Some(#token) {
+              let arrId = Gid.create()
+              let e1 = Event.Construction.ConnectNodes(arrId, source, target)
+              let e2 = Event.Construction.UpdateEdge(arrId, Event.Edge.Value(Some(1)))
+              dispatchC(Event.Construction.Multiple([e1, e2]))
+            } else {
+              dispatchC(Event.Construction.ConnectNodes(Gid.create(), source, target))
+            }
           }
         })
       | _ => ()
@@ -277,10 +306,14 @@ module App = {
     ])
 
     let keybindings = Js.Dict.fromArray([
-      ("t", addTokenNodeAt),
-      ("c", addConstructorNodeAt),
-      ("e", (e, ~x as _, ~y as _) => connectNodes(e)),
-      ("a", (e, ~x as _, ~y as _) => connectNodes(e)),
+      ("t", (e, ~x, ~y) => addTokenNodeAt(e, ~x, ~y, ~reversed=false)),
+      ("Shift+T", (e, ~x, ~y) => addTokenNodeAt(e, ~x, ~y, ~reversed=true)),
+      ("c", (e, ~x, ~y) => addConstructorNodeAt(e, ~x, ~y, ~reversed=false)),
+      ("Shift+C", (e, ~x, ~y) => addConstructorNodeAt(e, ~x, ~y, ~reversed=true)),
+      ("e", (e, ~x as _, ~y as _) => connectNodes(e, ~reversed=false)),
+      ("Shift+E", (e, ~x as _, ~y as _) => connectNodes(e, ~reversed=true)),
+      ("a", (e, ~x as _, ~y as _) => connectNodes(e, ~reversed=false)),
+      ("Shift+A", (e, ~x as _, ~y as _) => connectNodes(e, ~reversed=true)),
       ("x", (e, ~x as _, ~y as _) => deleteSelection(e)),
       ("Backspace", (e, ~x as _, ~y as _) => deleteSelection(e)),
       ("Delete", (e, ~x as _, ~y as _) => deleteSelection(e)),
@@ -381,13 +414,13 @@ module App = {
           />
           <Button.Separator />
           <Button
-            onClick={addTokenNodeAt(_, ~x=0., ~y=0.)}
+            onClick={addTokenNodeAt(_, ~x=0., ~y=0., ~reversed=false)}
             value="Token"
             enabled={toolbarActive}
             tooltip="T"
           />
           <Button
-            onClick={addConstructorNodeAt(_, ~x=0., ~y=0.)}
+            onClick={addConstructorNodeAt(_, ~x=0., ~y=0., ~reversed=false)}
             value="Constructor"
             enabled={toolbarActive}
             tooltip="C"
@@ -396,7 +429,12 @@ module App = {
           //   onClick={duplicateNodes} value="Duplicate" enabled={toolbarActive} tooltip="Ctrl+D"
           // />
           <Button.Separator />
-          <Button onClick={connectNodes} value="Connect" enabled={toolbarActive} tooltip="E" />
+          <Button
+            onClick={connectNodes(_, ~reversed=false)}
+            value="Connect"
+            enabled={toolbarActive}
+            tooltip="E"
+          />
           <Button.Separator />
           <Button onClick={deleteSelection} value="Delete" enabled={toolbarActive} tooltip="X" />
           <Button.Separator />
