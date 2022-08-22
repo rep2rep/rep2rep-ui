@@ -67,6 +67,18 @@ module App = {
     })
 
     let focused = state->State.focused
+    focused->Option.iter(focused =>
+      state
+      ->State.construction(focused)
+      ->Option.iter(construction => {
+        let constructions = construction->Constructions.fromViewConstruction
+        switch constructions->Or_error.match {
+        | Or_error.Ok(cs) =>
+          cs->Array.forEach(c => c->Constructions.toOrugaString->Rpc.Response.upon(Js.Console.log))
+        | Or_error.Err(e) => e->Error.toString->Js.Console.log
+        }
+      })
+    )
     let selection =
       focused
       ->Option.flatMap(state->State.construction(_))
@@ -302,6 +314,132 @@ module App = {
         })
       }
 
+    let magicNumber = (_, ~x, ~y, n) =>
+      focused
+      ->Option.flatMap(State.construction(state, _))
+      ->Option.iter(construction => {
+        let kind = vert =>
+          construction
+          ->State.Construction.getNode(vert)
+          ->Option.map(v =>
+            switch v {
+            | #token(_) => #token
+            | #constructor(_) => #constructor
+            }
+          )
+        switch GraphState.Selection.nodes(selection) {
+        | [] =>
+          if n > 0 {
+            // Behaviour: Add a new constructor, an output token, and "n" input tokens
+            let cons = Gid.create()
+            let out = Gid.create()
+            let x_space =
+              (120. *. Js.Math.pow_float(~base=0.8, ~exp=Int.toFloat(n)))->Js.Math.max_float(35.)
+            let y_space = 70.
+            let high_y = y -. y_space
+            let low_y = y +. y_space
+            let width = Int.toFloat(n - 1) *. x_space
+            let e_in = Array.range(1, n)->Array.flatMap(i => {
+              let tok = Gid.create()
+              let arr = Gid.create()
+              let new_x = Int.toFloat(i - 1) *. x_space +. x -. width /. 2.
+              [
+                Event.Construction.AddToken(tok, new_x, low_y),
+                Event.Construction.ConnectNodes(arr, tok, cons),
+                Event.Construction.UpdateEdge(arr, Event.Edge.Value(Some(i))),
+              ]
+            })
+            let es =
+              [
+                Event.Construction.AddConstructor(cons, x +. 5., y),
+                Event.Construction.AddToken(out, x, high_y),
+                Event.Construction.ConnectNodes(Gid.create(), cons, out),
+              ]->Array.concat(e_in)
+            dispatchC(Event.Construction.Multiple(es))
+          }
+        | [node] =>
+          switch kind(node) {
+          | None => ()
+          | Some(#token) =>
+            if n === 0 {
+              // Behaviour: The selected token is the output of a new constructor
+              let cons = Gid.create()
+              let arr = Gid.create()
+              let es = [
+                Event.Construction.AddConstructor(cons, x, y),
+                Event.Construction.ConnectNodes(arr, cons, node),
+              ]
+              dispatchC(Event.Construction.Multiple(es))
+            } else {
+              // Behaviour: The selected token is the "nth" input to a new constructor
+              let cons = Gid.create()
+              let arr = Gid.create()
+              let es = [
+                Event.Construction.AddConstructor(cons, x, y),
+                Event.Construction.ConnectNodes(arr, node, cons),
+                Event.Construction.UpdateEdge(arr, Event.Edge.Value(Some(n))),
+              ]
+              dispatchC(Event.Construction.Multiple(es))
+            }
+          | Some(#constructor) =>
+            if n === 0 {
+              // Behaviour: The selected construction feeds into a new token
+              let tok = Gid.create()
+              let arr = Gid.create()
+              let es = [
+                Event.Construction.AddToken(tok, x, y),
+                Event.Construction.ConnectNodes(arr, node, tok),
+              ]
+              dispatchC(Event.Construction.Multiple(es))
+            } else {
+              // Behaviour: The selected construction has the new token as the "nth" input
+              let tok = Gid.create()
+              let arr = Gid.create()
+              let es = [
+                Event.Construction.AddToken(tok, x, y),
+                Event.Construction.ConnectNodes(arr, tok, node),
+                Event.Construction.UpdateEdge(arr, Event.Edge.Value(Some(n))),
+              ]
+              dispatchC(Event.Construction.Multiple(es))
+            }
+          }
+        | [source, target] =>
+          if n === 0 {
+            // Behaviour: connect the constructor to the token
+            let s = kind(source)
+            let t = kind(target)
+            let e = if s === Some(#token) && t == Some(#constructor) {
+              Event.Construction.ConnectNodes(Gid.create(), target, source)->Some
+            } else if s === Some(#constructor) && t == Some(#token) {
+              Event.Construction.ConnectNodes(Gid.create(), source, target)->Some
+            } else {
+              None
+            }
+            e->Option.iter(dispatchC)
+          } else {
+            // Behaviour: Connect the token to the constructor as "nth" arrow
+            let s = kind(source)
+            let t = kind(target)
+            let arr = Gid.create()
+            let es = if s === Some(#token) && t == Some(#constructor) {
+              [
+                Event.Construction.ConnectNodes(arr, source, target),
+                Event.Construction.UpdateEdge(arr, Event.Edge.Value(Some(n))),
+              ]->Some
+            } else if s === Some(#constructor) && t == Some(#token) {
+              [
+                Event.Construction.ConnectNodes(arr, target, source),
+                Event.Construction.UpdateEdge(arr, Event.Edge.Value(Some(n))),
+              ]->Some
+            } else {
+              None
+            }
+            es->Option.iter(es => dispatchC(Event.Construction.Multiple(es)))
+          }
+        | _ => ()
+        }
+      })
+
     let deleteSelection = _ => {
       selection
       ->GraphState.Selection.nodes
@@ -340,19 +478,27 @@ module App = {
       K.create("Cmd+y", redo),
     ])
 
-    let keybindings = Js.Dict.fromArray([
-      ("t", (e, ~x, ~y) => addTokenNodeAt(e, ~x, ~y, ~reversed=false)),
-      ("Shift+T", (e, ~x, ~y) => addTokenNodeAt(e, ~x, ~y, ~reversed=true)),
-      ("c", (e, ~x, ~y) => addConstructorNodeAt(e, ~x, ~y, ~reversed=false)),
-      ("Shift+C", (e, ~x, ~y) => addConstructorNodeAt(e, ~x, ~y, ~reversed=true)),
-      ("e", (e, ~x as _, ~y as _) => connectNodes(e, ~reversed=false)),
-      ("Shift+E", (e, ~x as _, ~y as _) => connectNodes(e, ~reversed=true)),
-      ("a", (e, ~x as _, ~y as _) => connectNodes(e, ~reversed=false)),
-      ("Shift+A", (e, ~x as _, ~y as _) => connectNodes(e, ~reversed=true)),
-      ("x", (e, ~x as _, ~y as _) => deleteSelection(e)),
-      ("Backspace", (e, ~x as _, ~y as _) => deleteSelection(e)),
-      ("Delete", (e, ~x as _, ~y as _) => deleteSelection(e)),
-    ])
+    let keybindings = Js.Dict.fromArray(
+      Array.concat(
+        [
+          ("t", (e, ~x, ~y) => addTokenNodeAt(e, ~x, ~y, ~reversed=false)),
+          ("Shift+T", (e, ~x, ~y) => addTokenNodeAt(e, ~x, ~y, ~reversed=true)),
+          ("c", (e, ~x, ~y) => addConstructorNodeAt(e, ~x, ~y, ~reversed=false)),
+          ("Shift+C", (e, ~x, ~y) => addConstructorNodeAt(e, ~x, ~y, ~reversed=true)),
+          ("e", (e, ~x as _, ~y as _) => connectNodes(e, ~reversed=false)),
+          ("Shift+E", (e, ~x as _, ~y as _) => connectNodes(e, ~reversed=true)),
+          ("a", (e, ~x as _, ~y as _) => connectNodes(e, ~reversed=false)),
+          ("Shift+A", (e, ~x as _, ~y as _) => connectNodes(e, ~reversed=true)),
+          ("x", (e, ~x as _, ~y as _) => deleteSelection(e)),
+          ("Backspace", (e, ~x as _, ~y as _) => deleteSelection(e)),
+          ("Delete", (e, ~x as _, ~y as _) => deleteSelection(e)),
+        ],
+        Array.range(0, 9)->Array.map(i => (
+          Int.toString(i),
+          (e, ~x, ~y) => magicNumber(e, ~x, ~y, i),
+        )),
+      ),
+    )
 
     let (showGrid, setShowGrid) = React.useState(_ => {
       BoolStore.get("REP-SHOW-GRID")->Or_error.getWithDefault(false)
