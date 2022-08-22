@@ -235,7 +235,8 @@ module App = {
     // let duplicateNodes = _ => Js.Console.log("Duplicate Nodes!")
     let connectNodes = (_, ~reversed) =>
       switch GraphState.Selection.nodes(selection) {
-      | [source, target] =>
+      | [] | [_] => ()
+      | nodes =>
         focused
         ->Option.flatMap(State.construction(state, _))
         ->Option.iter(construction => {
@@ -248,25 +249,65 @@ module App = {
               | #constructor(_) => #constructor
               }
             )
-          let (source, target) = if reversed {
-            (target, source)
-          } else {
-            (source, target)
+          let (sources, targets) = {
+            // We have three happy cases, the rest bad:
+            // [a, b, ..., b]
+            // [a, ..., a, b]
+            // [a, b]
+            switch nodes {
+            | [] | [_] => ([], []) // Previously eliminated, but safer this way!
+            | [source, target] => ([source], [target])
+            | _ => {
+                let k1 = nodes[0]->Option.flatMap(kind)
+                let k2 = nodes[1]->Option.flatMap(kind)
+                let kn = nodes[Array.length(nodes) - 1]->Option.flatMap(kind)
+                (k1, k2, kn)
+                ->Option.both3
+                ->Option.flatMap(((k1, k2, kn)) => {
+                  let first = nodes[0]->Option.getExn // Safe!
+                  let rest = nodes->Array.sliceToEnd(1)
+                  let (last, all_but_last) = nodes->Array.pop
+                  if k1 !== k2 && k2 === kn && rest->Array.every(v => kind(v) === Some(k2)) {
+                    Some(([first], rest))
+                  } else if (
+                    k1 == k2 && k2 !== kn && all_but_last->Array.every(v => kind(v) === Some(k1))
+                  ) {
+                    Some(all_but_last, [last])
+                  } else {
+                    None
+                  }
+                })
+                ->Option.getWithDefault(([], []))
+              }
+            }
           }
-          let s = kind(source)
-          let t = kind(target)
-          if Option.isSome(s) && Option.isSome(t) && Option.getExn(s) !== Option.getExn(t) {
+          let (sources, targets) = if reversed {
+            (targets, sources)
+          } else {
+            (sources, targets)
+          }
+          if Array.length(sources) !== 0 && Array.length(targets) !== 0 {
+            let s = sources[0]->Option.flatMap(kind)
             if s === Some(#token) {
-              let arrId = Gid.create()
-              let e1 = Event.Construction.ConnectNodes(arrId, source, target)
-              let e2 = Event.Construction.UpdateEdge(arrId, Event.Edge.Value(Some(1)))
-              dispatchC(Event.Construction.Multiple([e1, e2]))
+              let es = sources->Array.flatMapWithIndex((i, source) =>
+                targets->Array.flatMap(target => {
+                  let arrId = Gid.create()
+                  let e1 = Event.Construction.ConnectNodes(arrId, source, target)
+                  let e2 = Event.Construction.UpdateEdge(arrId, Event.Edge.Value(Some(i + 1)))
+                  [e1, e2]
+                })
+              )
+              dispatchC(Event.Construction.Multiple(es))
             } else {
-              dispatchC(Event.Construction.ConnectNodes(Gid.create(), source, target))
+              let es = sources->Array.flatMap(source =>
+                targets->Array.map(target => {
+                  Event.Construction.ConnectNodes(Gid.create(), source, target)
+                })
+              )
+              dispatchC(Event.Construction.Multiple(es))
             }
           }
         })
-      | _ => ()
       }
     let deleteSelection = _ => {
       selection
