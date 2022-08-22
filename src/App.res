@@ -151,6 +151,7 @@ module App = {
     let redo = _ => focused->Option.iter(focused => dispatch(Event.Redo(focused)))
 
     let toolbarActive = focused->Option.isSome
+
     let addTokenNodeAt = (_, ~x, ~y, ~reversed) => {
       let tok = Gid.create()
       switch GraphState.Selection.nodes(selection) {
@@ -190,6 +191,7 @@ module App = {
       }
       dispatchC(Event.Construction.ChangeSelection(GraphState.Selection.singleNode(tok)))
     }
+
     let addConstructorNodeAt = (_, ~x, ~y, ~reversed) => {
       let cons = Gid.create()
       switch GraphState.Selection.nodes(selection) {
@@ -232,7 +234,7 @@ module App = {
       }
       dispatchC(Event.Construction.ChangeSelection(GraphState.Selection.singleNode(cons)))
     }
-    // let duplicateNodes = _ => Js.Console.log("Duplicate Nodes!")
+
     let connectNodes = (_, ~reversed) =>
       switch GraphState.Selection.nodes(selection) {
       | [] | [_] => ()
@@ -309,6 +311,7 @@ module App = {
           }
         })
       }
+
     let deleteSelection = _ => {
       selection
       ->GraphState.Selection.nodes
@@ -328,6 +331,7 @@ module App = {
       let unselect = Event.Construction.ChangeSelection(GraphState.Selection.empty)
       dispatchC(Event.Construction.Multiple(Array.concat(es, [unselect])))
     }
+
     let movedNode = (id, ~x, ~y) =>
       dispatchC(
         Event.Construction.MoveNode(id->ReactD3Graph.Node.Id.toString->Gid.fromString, x, y),
@@ -358,7 +362,6 @@ module App = {
       ("x", (e, ~x as _, ~y as _) => deleteSelection(e)),
       ("Backspace", (e, ~x as _, ~y as _) => deleteSelection(e)),
       ("Delete", (e, ~x as _, ~y as _) => deleteSelection(e)),
-      // ("Ctrl+d", (e, ~x as _, ~y as _) => duplicateNodes(e)),
     ])
 
     let (showGrid, setShowGrid) = React.useState(_ => {
