@@ -404,7 +404,7 @@ module Token = {
               )
               ->Event.Token.Subtype
               ->onChange}
-            exclude={%re("/[^a-zA-Z_]/gi")}
+            exclude={%re("/[ :,]/gi")}
           />
         </Row>
       } else {
