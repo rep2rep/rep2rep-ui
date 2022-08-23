@@ -50,6 +50,7 @@ module Construction = {
           })
       }
     }
+    let hash = Hash.record2(("name", String.hash), ("notes", String.hash))
 
     let name = t => t.name
     let notes = t => t.notes
@@ -182,6 +183,33 @@ module Construction = {
     }
   }
   module Storage = StorageMkr(Stable.V1)
+
+  let hash = Hash.record6(
+    ("metadata", Metadata.hash),
+    ("space", Option.hash(_, String.hash)),
+    (
+      "tokenData",
+      toks =>
+        toks
+        ->Gid.Map.toArray
+        ->Array.hash(((id, data)) => [Gid.hash(id), TokenData.hash(data)]->Hash.combine),
+    ),
+    (
+      "constructorData",
+      cons =>
+        cons
+        ->Gid.Map.toArray
+        ->Array.hash(((id, data)) => [Gid.hash(id), ConstructorData.hash(data)]->Hash.combine),
+    ),
+    (
+      "edgeData",
+      edges =>
+        edges
+        ->Gid.Map.toArray
+        ->Array.hash(((id, data)) => [Gid.hash(id), EdgeData.hash(data)]->Hash.combine),
+    ),
+    ("graph", GraphState.hash),
+  )
 
   let graph = t => t.graph
   let metadata = t => t.metadata
@@ -364,6 +392,21 @@ type t = {
   spaces: String.Map.t<CSpace.conSpec>,
   typeSystems: String.Map.t<FiniteSet.t<Type.PrincipalType.t>>,
 }
+
+let hash = Hash.record5(
+  ("focused", Option.hash(_, Gid.hash)),
+  ("order", FileTree.hash(_, Gid.hash)),
+  (
+    "constructions",
+    cons =>
+      cons
+      ->Gid.Map.toArray
+      ->Array.map(((id, ur)) => (id, UndoRedo.state(ur)))
+      ->Array.hash(((id, cons)) => [Gid.hash(id), Construction.hash(cons)]->Hash.combine),
+  ),
+  ("spaces", spaces => spaces->String.Map.keysToArray->Array.hash(String.hash)),
+  ("typeSystems", tss => tss->String.Map.keysToArray->Array.hash(String.hash)),
+)
 
 let empty = {
   focused: None,

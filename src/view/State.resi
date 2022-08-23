@@ -46,6 +46,8 @@ module Construction: {
 
 type t
 
+let hash: t => Hash.t
+
 let empty: t
 let focused: t => option<Gid.t>
 let constructions: t => FileTree.t<(Gid.t, Construction.t)>

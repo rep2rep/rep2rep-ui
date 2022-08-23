@@ -54,3 +54,16 @@ let duplicate = t => {
   constructor: t.constructor,
   notes: t.notes,
 }
+
+let hash_constructor = con => {
+  let name = CSpace.constructorName(con)
+  let (ins, out) = CSpace.constructorSignature(con)
+  let type_hash = ty => ty->Type.name->String.hash
+
+  let in_hash = ins->Array.hash(type_hash)
+  let out_hash = type_hash(out)
+  let name_hash = String.hash(name)
+  [name_hash, in_hash, out_hash]->Hash.combine
+}
+
+let hash = Hash.record2(("constructor", hash_constructor), ("notes", String.hash))

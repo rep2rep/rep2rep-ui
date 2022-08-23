@@ -30,6 +30,8 @@ module GraphLink: {
 module Selection: {
   type t
 
+  let hash: t => Hash.t
+
   let empty: t
   let nodes: t => array<Gid.t>
   let links: t => array<Gid.t>
@@ -39,6 +41,8 @@ module Selection: {
 }
 
 type t
+
+let hash: t => Hash.t
 
 let duplicate: (t, Gid.Map.t<Gid.t>) => t
 let empty: t

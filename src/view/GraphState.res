@@ -6,7 +6,32 @@ module GraphNode = {
     | Token(TokenData.t)
     | Constructor(ConstructorData.t)
 
+  let hash_nodeData = nd =>
+    switch nd {
+    | Token(data) => [String.hash("token"), TokenData.hash(data)]->Hash.combine
+    | Constructor(data) => [String.hash("constructor"), ConstructorData.hash(data)]->Hash.combine
+    }
+
   type t = (ReactD3Graph.Node.t<[#token | #constructor]>, nodeData)
+
+  let hash = ((node, data)) => {
+    let id = ReactD3Graph.Node.id(node)->toGid
+    let x = ReactD3Graph.Node.x(node)
+    let y = ReactD3Graph.Node.y(node)
+    let payload = ReactD3Graph.Node.payload(node)
+    let hash_payload = p =>
+      switch p {
+      | #token => String.hash("token")
+      | #constructor => String.hash("constructor")
+      }
+    Hash.combine([
+      Gid.hash(id),
+      Float.hash(x),
+      Float.hash(y),
+      Option.hash(payload, hash_payload),
+      hash_nodeData(data),
+    ])
+  }
 
   let unselectedFill = "white"
   let selectedFill = "rgb(220, 220, 220)"
@@ -181,6 +206,21 @@ module GraphNode = {
 
 module GraphLink = {
   type t = (ReactD3Graph.Link.t<unit>, EdgeData.t)
+
+  let hash = ((link, data)) => {
+    let source = ReactD3Graph.Link.source(link)->toGid
+    let target = ReactD3Graph.Link.target(link)->toGid
+    let id =
+      ReactD3Graph.Link.id(link)
+      ->Option.map(ReactD3Graph.Link.Id.toString)
+      ->Option.map(Gid.fromString)
+    Hash.combine([
+      Gid.hash(source),
+      Gid.hash(target),
+      Option.hash(id, Gid.hash),
+      EdgeData.hash(data),
+    ])
+  }
 
   let makeConfig = edgeData => {
     let offsets = (src, tgt, _) =>
@@ -360,6 +400,11 @@ module Selection = {
     links: array<Gid.t>,
   }
 
+  let hash: t => Hash.t = Hash.record2(
+    ("nodes", Array.hash(_, Gid.hash)),
+    ("links", Array.hash(_, Gid.hash)),
+  )
+
   let empty = {
     nodes: [],
     links: [],
@@ -385,6 +430,12 @@ type t = {
   links: array<GraphLink.t>,
   selection: Selection.t,
 }
+
+let hash = Hash.record3(
+  ("nodes", Array.hash(_, GraphNode.hash)),
+  ("links", Array.hash(_, GraphLink.hash)),
+  ("selection", Selection.hash),
+)
 
 let empty = {
   nodes: [],

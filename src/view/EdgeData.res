@@ -56,6 +56,13 @@ module Stable = {
   }
 }
 
+let hash: t => Hash.t = Hash.record4(
+  ("source", Gid.hash),
+  ("target", Gid.hash),
+  ("payload", Option.hash(_, Int.hash)),
+  ("notes", String.hash),
+)
+
 let create = (source, target, payload) => {
   source: source,
   target: target,
