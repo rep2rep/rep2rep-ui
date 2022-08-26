@@ -12,5 +12,4 @@ let tc_rpc: Rpc.Datatype.t<tc>
 let construction_rpc: Rpc.Datatype.t<construction>
 let walk_rpc: Rpc.Datatype.t<walk>
 
-let fromViewConstruction: State.Construction.t => Or_error.t<array<construction>>
 let toOrugaString: construction => Rpc.Response.t<string>

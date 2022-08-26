@@ -32,6 +32,7 @@ module Construction: {
   let deleteNode: (t, Gid.t) => t
   let deleteLink: (t, Gid.t) => t
   let setSelection: (t, GraphState.Selection.t) => t
+  let toOruga: t => Or_error.t<array<Constructions.construction>>
   let getNode: (t, Gid.t) => option<[#token(TokenData.t) | #constructor(ConstructorData.t)]>
   let getLink: (t, Gid.t) => option<EdgeData.t>
 
