@@ -525,7 +525,7 @@ module App = {
         data={State.constructions(state)}
         dataName={construction =>
           construction->State.Construction.metadata->State.Construction.Metadata.name}
-        title="RST Edtior"
+        title="RST Editor"
         version="##VERSION##"
         importExtensions=[".rst"]
         active={State.focused(state)}
