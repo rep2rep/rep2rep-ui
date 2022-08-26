@@ -1,6 +1,6 @@
 type t = {
   label: string,
-  payload: option<string>,
+  payload: option<(string, float, float)>,
   type_: option<Type.typ>,
   subtype: option<string>,
   notes: string,
@@ -10,17 +10,44 @@ module Stable = {
   module V1 = {
     type t = t = {
       label: string,
-      payload: option<string>,
+      payload: option<(string, float, float)>,
       type_: option<Type.typ>,
       subtype: option<string>,
       notes: string,
+    }
+
+    let triple_toJson: (
+      ('a, 'b, 'c),
+      'a => Js.Json.t,
+      'b => Js.Json.t,
+      'c => Js.Json.t,
+    ) => Js.Json.t = ((a, b, c), a_toJson, b_toJson, c_toJson) => {
+      [a_toJson(a), b_toJson(b), c_toJson(c)]->Array.toJson(j => j)
+    }
+    let triple_fromJson: (
+      Js.Json.t,
+      Js.Json.t => Or_error.t<'a>,
+      Js.Json.t => Or_error.t<'b>,
+      Js.Json.t => Or_error.t<'c>,
+    ) => Or_error.t<('a, 'b, 'c)> = (json, a_fromJson, b_fromJson, c_fromJson) => {
+      json
+      ->Array.fromJson(j => Or_error.create(j))
+      ->Or_error.flatMap(arr =>
+        switch arr {
+        | [a, b, c] => (a_fromJson(a), b_fromJson(b), c_fromJson(c))->Or_error.both3
+        | _ => Or_error.error_s("JSON triple does not have three elements")
+        }
+      )
     }
 
     let toJson = t =>
       Js.Dict.fromArray([
         ("version", 1->Int.toJson),
         ("label", t.label->String.toJson),
-        ("payload", t.payload->Option.toJson(String.toJson)),
+        (
+          "payload",
+          t.payload->Option.toJson(triple_toJson(_, String.toJson, Float.toJson, Float.toJson)),
+        ),
         ("type_", t.type_->Option.toJson(Type.typ_toJson)),
         ("subtype", t.subtype->Option.toJson(String.toJson)),
         ("notes", t.notes->String.toJson),
@@ -40,7 +67,13 @@ module Stable = {
         switch version->Or_error.match {
         | Or_error.Ok(1) => {
             let label = getValue("label", String.fromJson)
-            let payload = getValue("payload", Option.fromJson(_, String.fromJson))
+            let payload = getValue(
+              "payload",
+              Option.fromJson(
+                _,
+                triple_fromJson(_, String.fromJson, Float.fromJson, Float.fromJson),
+              ),
+            )
             let type_ = getValue("type_", Option.fromJson(_, Type.typ_fromJson))
             let subtype = getValue("subtype", Option.fromJson(_, String.fromJson))
             let notes = getValue("notes", String.fromJson)
@@ -79,17 +112,33 @@ let duplicate = t => {
 
 let hash: t => Hash.t = Hash.record5(
   ("label", String.hash),
-  ("payload", Option.hash(_, String.hash)),
+  (
+    "payload",
+    Option.hash(_, ((a, b, c)) => Hash.combine([String.hash(a), Float.hash(b), Float.hash(c)])),
+  ),
   ("type_", ty => ty->Option.map(Type.name)->Option.hash(String.hash)),
   ("subtype", Option.hash(_, String.hash)),
   ("notes", String.hash),
 )
 
+let setPayload = (t, payload) => {...t, payload: payload}
+
 // Perhaps we can dispatch these off to a "plugin"? E.g, if we know the RS, we send [t] to
 // a plugin which has said "I am a renderer for this RS", and get back a React component and a size.
 let size = t =>
-  {"width": String.length(t.label)->(f => f * 10)->Int.toFloat->Float.max(20.), "height": 20.}
+  t.payload
+  ->Option.map(((_, w, h)) => {"width": w, "height": h})
+  ->Option.getWithDefault({
+    "width": String.length(t.label)->(f => f * 10)->Int.toFloat->Float.max(20.),
+    "height": 20.,
+  })
 let render = t =>
-  <text x={"50%"} y={"50%"} textAnchor="middle" dominantBaseline="central">
-    {React.string(t.label)}
-  </text>
+  t.payload
+  ->Option.map(((payload, _, _)) => {
+    <g dangerouslySetInnerHTML={"__html": payload} />
+  })
+  ->Option.getWithDefault(
+    <text x={"50%"} y={"50%"} textAnchor="middle" dominantBaseline="central">
+      {React.string(t.label)}
+    </text>,
+  )
