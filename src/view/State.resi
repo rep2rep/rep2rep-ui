@@ -56,9 +56,12 @@ let construction: (t, Gid.t) => option<Construction.t>
 let spaces: t => String.Map.t<CSpace.conSpec>
 let getSpace: (t, string) => option<CSpace.conSpec>
 let typeSystems: t => String.Map.t<FiniteSet.t<Type.PrincipalType.t>>
+let renderable: (t, string) => bool
+let renderConstruction: (t, Gid.t) => Or_error.t<Rpc.Response.t<Construction.t>>
 
 let loadSpaces: t => Rpc.Response.t<t>
 let loadTypeSystems: t => Rpc.Response.t<t>
+let loadRenderers: t => Rpc.Response.t<t>
 
 let setDB: (IndexedDB.t, string) => unit
 

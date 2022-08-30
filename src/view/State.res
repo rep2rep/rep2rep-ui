@@ -538,9 +538,10 @@ type t = {
   constructions: Gid.Map.t<UndoRedo.t<Construction.t>>,
   spaces: String.Map.t<CSpace.conSpec>,
   typeSystems: String.Map.t<FiniteSet.t<Type.PrincipalType.t>>,
+  renderers: String.Map.t<string>, // Endpoints for renderers by space
 }
 
-let hash = Hash.record5(
+let hash = Hash.record6(
   ("focused", Option.hash(_, Gid.hash)),
   ("order", FileTree.hash(_, Gid.hash)),
   (
@@ -553,6 +554,13 @@ let hash = Hash.record5(
   ),
   ("spaces", spaces => spaces->String.Map.keysToArray->Array.hash(String.hash)),
   ("typeSystems", tss => tss->String.Map.keysToArray->Array.hash(String.hash)),
+  (
+    "renderers",
+    ps =>
+      ps
+      ->String.Map.toArray
+      ->Array.hash(((k, v)) => Hash.combine([String.hash(k), String.hash(v)])),
+  ),
 )
 
 let empty = {
@@ -561,6 +569,7 @@ let empty = {
   constructions: Gid.Map.empty(),
   spaces: String.Map.empty,
   typeSystems: String.Map.empty,
+  renderers: String.Map.empty,
 }
 
 let focused = t => t.focused
@@ -572,6 +581,7 @@ let construction = (t, id) => t.constructions->Gid.Map.get(id)->Option.map(UndoR
 let spaces = t => t.spaces
 let typeSystems = t => t.typeSystems
 let getSpace = (t, name) => t.spaces->String.Map.get(name)
+let renderable = (t, space) => t.renderers->String.Map.has(space)
 
 let getAvailableSpaces: unit => Rpc.Response.t<array<CSpace.conSpec>> = Rpc_service.require(
   "server.spaces",
@@ -597,6 +607,17 @@ let loadTypeSystems = t =>
   getAvailableTypeSystems()->Rpc.Response.map(systems => {
     ...t,
     typeSystems: systems->String.Map.fromArray,
+  })
+
+let getAvailableRenderers: unit => Rpc.Response.t<array<(string, string)>> = Rpc_service.require(
+  "server.renderers",
+  Rpc.Datatype.unit_,
+  Array.t_rpc(Rpc.Datatype.tuple2_(String.t_rpc, String.t_rpc)),
+)
+let loadRenderers = t =>
+  getAvailableRenderers()->Rpc.Response.map(renderers => {
+    ...t,
+    renderers: renderers->String.Map.fromArray,
   })
 
 let setDB = (newDB, store) => db->SetOnce.set((newDB, store))
@@ -649,6 +670,7 @@ let load = () => {
       constructions: constructions,
       spaces: String.Map.empty,
       typeSystems: String.Map.empty,
+      renderers: String.Map.empty,
     })
   })
 }
@@ -742,6 +764,47 @@ let updateConstructionBypassingUndoRedo = (t, id, f) => {
     }),
   ),
 }
+
+let renderConstruction = (t, id) =>
+  t.constructions
+  ->Gid.Map.get(id)
+  ->Or_error.fromOption_s("Cannot find construction to render")
+  ->Or_error.flatMap(c => {
+    let c = UndoRedo.state(c)
+    c
+    ->Construction.space
+    ->Option.flatMap(t.renderers->String.Map.get)
+    ->Or_error.fromOption_s("Construction Space is not renderable")
+    ->Or_error.flatMap(endpoint => {
+      let f = Rpc_service.require(
+        endpoint,
+        Constructions.construction_rpc,
+        Array.t_rpc(
+          Rpc.Datatype.tuple2_(
+            Gid.t_rpc,
+            Option.t_rpc(Rpc.Datatype.tuple3_(String.t_rpc, Float.t_rpc, Float.t_rpc)),
+          ),
+        ),
+      )
+      c
+      ->Construction.toOruga
+      ->Or_error.flatMap(cs =>
+        switch cs {
+        | [o] =>
+          o
+          ->f
+          ->Rpc.Response.map(renderedToks => {
+            Js.Console.log(renderedToks)
+            renderedToks->Array.reduce(c, (c', (tokId, payload)) =>
+              c'->Construction.updateToken(tokId, TokenData.setPayload(_, payload))
+            )
+          })
+          ->Or_error.create
+        | _ => Or_error.error_s("Not a construction!")
+        }
+      )
+    })
+  })
 
 let newFolder = (t, id, name, path) => {
   ...t,

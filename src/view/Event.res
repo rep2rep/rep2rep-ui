@@ -66,6 +66,7 @@ module Construction = {
     | UpdateToken(Gid.t, Token.t)
     | UpdateConstructor(Gid.t, Constructor.t)
     | UpdateEdge(Gid.t, Edge.t)
+    | Replace(State.Construction.t)
 
   let rec dispatch = (construction, t) =>
     switch t {
@@ -87,6 +88,7 @@ module Construction = {
       construction->State.Construction.updateConstructor(id, con => con->Constructor.dispatch(ev))
     | UpdateEdge(id, ev) =>
       construction->State.Construction.updateEdge(id, ed => ed->Edge.dispatch(ev))
+    | Replace(c2) => c2
     }
 }
 

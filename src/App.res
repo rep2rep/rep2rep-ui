@@ -60,6 +60,7 @@ module App = {
       state
       ->State.loadSpaces
       ->Rpc.Response.flatMap(State.loadTypeSystems)
+      ->Rpc.Response.flatMap(State.loadRenderers)
       ->Rpc.Response.upon(state => {
         dispatch(Event.Update(state))
       })
@@ -141,6 +142,15 @@ module App = {
         Downloader.download(name ++ ".rst", content)
       })
     }
+
+    let renderConstruction = id =>
+      switch state->State.renderConstruction(id)->Or_error.match {
+      | Or_error.Err(e) => Js.Console.log(e)
+      | Or_error.Ok(construction) => {
+          Js.Console.log(construction)
+          construction->Rpc.Response.upon(c => dispatchC(Event.Construction.Replace(c)))
+        }
+      }
 
     let createFolder = path => dispatch(Event.NewFolder(Gid.create(), "Folder", path))
     let renameFolder = (id, newName) => dispatch(Event.RenameFolder(id, newName))
@@ -622,6 +632,17 @@ module App = {
             onChange={toggleGrid}
             checked={showGrid}
             style={ReactDOM.Style.make(~marginLeft="0.5em", ())}
+          />
+          <Button.Separator />
+          <Button
+            onClick={_ => focused->Option.iter(renderConstruction)}
+            value="Render"
+            enabled={toolbarActive &&
+            focused
+            ->Option.flatMap(state->State.construction(_))
+            ->Option.flatMap(State.Construction.space)
+            ->Option.map(state->State.renderable(_))
+            ->Option.getWithDefault(false)}
           />
           // <Button.Separator />
           // <a href="manual.html" target="_blank"> {React.string("Manual")} </a>
