@@ -146,9 +146,8 @@ module App = {
     let renderConstruction = id =>
       switch state->State.renderConstruction(id)->Or_error.match {
       | Or_error.Err(e) => Js.Console.log(e)
-      | Or_error.Ok(construction) => construction->Rpc.Response.upon(c =>
-          dispatchC(Event.Construction.Replace(c))
-        )
+      | Or_error.Ok(construction) =>
+        construction->Rpc.Response.upon(c => dispatchC(Event.Construction.Replace(c)))
       }
 
     let createFolder = path => dispatch(Event.NewFolder(Gid.create(), "Folder", path))

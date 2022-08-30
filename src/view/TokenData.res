@@ -134,8 +134,10 @@ let size = t =>
   })
 let render = t =>
   t.payload
-  ->Option.map(((payload, _, _)) => {
-    <g dangerouslySetInnerHTML={"__html": payload} />
+  ->Option.map(((payload, w, h)) => {
+    <foreignObject width={Float.toString(w)} height={Float.toString(h)}>
+      <div xmlns="http://www.w3.org/1999/xhtml" dangerouslySetInnerHTML={"__html": payload} />
+    </foreignObject>
   })
   ->Option.getWithDefault(
     <text x={"50%"} y={"50%"} textAnchor="middle" dominantBaseline="central">
