@@ -123,8 +123,6 @@ let hash: t => Hash.t = Hash.record5(
 
 let setPayload = (t, payload) => {...t, payload: payload}
 
-// Perhaps we can dispatch these off to a "plugin"? E.g, if we know the RS, we send [t] to
-// a plugin which has said "I am a renderer for this RS", and get back a React component and a size.
 let size = t =>
   t.payload
   ->Option.map(((_, w, h)) => {"width": w, "height": h})
@@ -132,6 +130,7 @@ let size = t =>
     "width": String.length(t.label)->(f => f * 10)->Int.toFloat->Float.max(20.),
     "height": 20.,
   })
+
 let render = t =>
   t.payload
   ->Option.map(((payload, w, h)) => {
