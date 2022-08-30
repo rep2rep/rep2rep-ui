@@ -781,8 +781,8 @@ let renderConstruction = (t, id) =>
         Constructions.construction_rpc,
         Array.t_rpc(
           Rpc.Datatype.tuple2_(
-            Gid.t_rpc,
-            Option.t_rpc(Rpc.Datatype.tuple3_(String.t_rpc, Float.t_rpc, Float.t_rpc)),
+            String.t_rpc,
+            Rpc.Datatype.tuple3_(String.t_rpc, Float.t_rpc, Float.t_rpc),
           ),
         ),
       )
@@ -794,9 +794,11 @@ let renderConstruction = (t, id) =>
           o
           ->f
           ->Rpc.Response.map(renderedToks => {
-            Js.Console.log(renderedToks)
             renderedToks->Array.reduce(c, (c', (tokId, payload)) =>
-              c'->Construction.updateToken(tokId, TokenData.setPayload(_, payload))
+              c'->Construction.updateToken(
+                tokId->Gid.fromString,
+                TokenData.setPayload(_, Some(payload)),
+              )
             )
           })
           ->Or_error.create
