@@ -794,6 +794,12 @@ let renderConstruction = (t, id) =>
           o
           ->f
           ->Rpc.Response.map(renderedToks => {
+            let c =
+              c
+              ->Construction.tokens
+              ->Array.reduce(c, (c', id) =>
+                c'->Construction.updateToken(id, TokenData.setPayload(_, None))
+              )
             renderedToks->Array.reduce(c, (c', (tokId, payload)) =>
               c'->Construction.updateToken(
                 tokId->Gid.fromString,

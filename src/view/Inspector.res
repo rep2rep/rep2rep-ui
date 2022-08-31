@@ -278,7 +278,7 @@ module TypeContext = {
   let makeArrows = (positions, arrows) => {
     let layer_height = 12.
     let v_offset = 5.
-    arrows->Array.map(((sub, sup)) => {
+    arrows->Array.mapWithIndex((i, (sub, sup)) => {
       let sub = Type.name(sub)
       let sup = Type.name(sup)
       let (x1, y1) = positions->String.Map.getExn(sub)
@@ -294,7 +294,7 @@ module TypeContext = {
         (f(x1), f(x2))
       }
       <line
-        key={sub ++ "$" ++ sup}
+        key={sub ++ "$" ++ sup ++ "$" ++ Int.toString(i)}
         x1={Float.toString(x1)}
         y1={Float.toString(y1)}
         x2={Float.toString(x2)}
