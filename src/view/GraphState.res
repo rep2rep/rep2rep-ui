@@ -82,7 +82,7 @@ module GraphNode = {
         <>
           <circle
             cx="6"
-            cy="6"
+            cy="13"
             r="5"
             fill={if ReactD3Graph.Node.selected(node) {
               selectedFill
@@ -96,7 +96,7 @@ module GraphNode = {
               unselectedStrokeWidth
             }}
           />
-          <text x="15" y="15">
+          <text x="15" y="12">
             {React.string(
               content.constructor->Option.map(CSpace.constructorName)->Option.getWithDefault("-"),
             )}
@@ -235,14 +235,14 @@ module GraphLink = {
         | #token => (src["x"], src["y"])
         | #constructor => (
             src["x"] -. ssize["width"] /. 20. +. 6.,
-            src["y"] -. ssize["height"] /. 20. +. 6.,
+            src["y"] -. ssize["height"] /. 20. +. 13.,
           )
         }
         let (x2, y2) = switch p_tgt {
         | #token => (tgt["x"], tgt["y"])
         | #constructor => (
             tgt["x"] -. tsize["width"] /. 20. +. 6.,
-            tgt["y"] -. tsize["height"] /. 20. +. 6.,
+            tgt["y"] -. tsize["height"] /. 20. +. 13.,
           )
         }
         let cons = (~isSource) => {
@@ -260,7 +260,7 @@ module GraphLink = {
           let (dx, dy) = (x /. l, y /. l)
           {
             "dx": 6. *. dx -. size["width"] /. 20. +. 6.,
-            "dy": 6. *. dy -. size["height"] /. 20. +. 6.,
+            "dy": 6. *. dy -. size["height"] /. 20. +. 13.,
           }
         }
         let tok = (~isSource) => {
