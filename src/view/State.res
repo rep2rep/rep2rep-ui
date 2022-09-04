@@ -532,14 +532,12 @@ module Construction = {
   }
 
   let fromOruga = (cons, ~space) => {
-    Js.Console.log(cons)
     let ids = ref(String.Map.empty)
     let tokenData = ref(Gid.Map.empty())
     let constructorData = ref(Gid.Map.empty())
     let edgeData = ref(Gid.Map.empty())
     cons->Array.forEach(con => {
       let readOrugaType = ty => {
-        Js.Console.log((ty, Type.split(ty)))
         switch Type.split(ty) {
         | [] => (None, None)
         | [a] => (Some(a), None)
