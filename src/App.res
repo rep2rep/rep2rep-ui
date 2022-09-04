@@ -167,6 +167,30 @@ module App = {
         construction->Rpc.Response.upon(c => dispatchC(Event.Construction.Replace(c)))
       }
 
+    let transferConstruction = (id, targetSpace) =>
+      id->Option.iter(id =>
+        state
+        ->State.construction(id)
+        ->Option.iter(construction =>
+          construction
+          ->State.Construction.transfer(~targetSpace)
+          ->Or_error.iter(
+            Rpc.Response.upon(
+              _,
+              // TODO: Add the construction to the file list!
+              newConstruction =>
+                newConstruction->Or_error.iter(newConstruction => {
+                  let consId = Gid.create()
+                  let path =
+                    state->State.pathForConstruction(id)->Option.getWithDefault(FileTree.Path.root)
+                  Js.Console.log(newConstruction)
+                  dispatch(Event.ImportConstruction(consId, newConstruction, path))
+                }),
+            ),
+          )
+        )
+      )
+
     let createFolder = path => dispatch(Event.NewFolder(Gid.create(), "Folder", path))
     let renameFolder = (id, newName) => dispatch(Event.RenameFolder(id, newName))
     let deleteFolder = id => dispatch(Event.DeleteFolder(id))
@@ -658,6 +682,18 @@ module App = {
             ->Option.flatMap(State.Construction.space)
             ->Option.map(state->State.renderable(_))
             ->Option.getWithDefault(false)}
+          />
+          <Button
+            onClick={_ => {
+              let target = Dialog.prompt(
+                ~description="Name of target construction space: ",
+                ~default="",
+              )
+              let id = focused
+              target->Option.iter(transferConstruction(id, _))
+            }}
+            value="DO NOT CLICK"
+            enabled={toolbarActive}
           />
           // <Button.Separator />
           // <a href="manual.html" target="_blank"> {React.string("Manual")} </a>

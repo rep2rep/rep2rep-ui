@@ -530,6 +530,113 @@ module Construction = {
       ->Or_error.map(Array.map(_, fst))
     }
   }
+
+  let fromOruga = (cons, ~space) => {
+    Js.Console.log(cons)
+    let ids = ref(String.Map.empty)
+    let tokenData = ref(Gid.Map.empty())
+    let constructorData = ref(Gid.Map.empty())
+    let edgeData = ref(Gid.Map.empty())
+    cons->Array.forEach(con => {
+      let readOrugaType = ty => {
+        Js.Console.log((ty, Type.split(ty)))
+        switch Type.split(ty) {
+        | [] => (None, None)
+        | [a] => (Some(a), None)
+        | arr => (Some(arr[1]->Option.getExn), Some(arr[0]->Option.getExn->Type.name))
+        }
+      }
+      let handleToken = (tok, missingLink) => {
+        let tname = CSpace.tokenName(tok)
+        let ttyp = CSpace.tokenType(tok)
+        let tid = switch ids.contents->String.Map.get(tname) {
+        | Some(id) => id
+        | None => {
+            let id = Gid.create()
+            ids := ids.contents->String.Map.set(tname, id)
+            id
+          }
+        }
+        switch tokenData.contents->Gid.Map.get(tid) {
+        | Some(td) => () // Already added, we're fine!
+        | None => {
+            let (type_, subtype) = readOrugaType(ttyp)
+            let td = TokenData.create(~type_?, ~subtype?, tname)
+            tokenData := tokenData.contents->Gid.Map.set(tid, td)
+          }
+        }
+        missingLink->Option.iter(((idx, connectTo)) => {
+          let eid = Gid.create()
+          let ed = EdgeData.create(tid, connectTo, Some(idx))
+          edgeData := edgeData.contents->Gid.Map.set(eid, ed)
+        })
+        tid
+      }
+      let rec traverseCons = (c, missingLink) =>
+        switch c {
+        | Constructions.TCPair({token: tok, constructor: cons}, inputs) => {
+            let tid = handleToken(tok, missingLink)
+            let cd = {ConstructorData.constructor: Some(cons), notes: ""}
+            let cid = Gid.create()
+            constructorData := constructorData.contents->Gid.Map.set(cid, cd)
+            let eid = Gid.create()
+            let ed = EdgeData.create(cid, tid, None)
+            edgeData := edgeData.contents->Gid.Map.set(eid, ed)
+            inputs->Array.forEachWithIndex((idx, con) => traverseCons(con, Some(idx + 1, cid)))
+          }
+        | Constructions.Source(tok) => handleToken(tok, missingLink)->ignore
+        | Constructions.Reference(tok) => handleToken(tok, missingLink)->ignore
+        }
+      traverseCons(con, None)
+    })
+    Or_error.create({
+      metadata: {
+        name: "Transformed construction",
+        notes: "This construction is a result of applying structure transfer.",
+      },
+      space: Some(space),
+      tokenData: tokenData.contents,
+      constructorData: constructorData.contents,
+      edgeData: edgeData.contents,
+      graph: GraphState.layout(
+        ~tokens=tokenData.contents,
+        ~constructors=constructorData.contents,
+        ~edges=edgeData.contents,
+      ),
+    })
+  }
+
+  let _transfer = Rpc_service.require(
+    "server.transfer",
+    Rpc.Datatype.tuple3_(Constructions.construction_rpc, String.t_rpc, String.t_rpc),
+    Array.t_rpc(Constructions.construction_rpc),
+  )
+
+  let transfer = (t, ~targetSpace) => {
+    let cons = t->toOruga
+    let space = t.space->Or_error.fromOption_s("Structure graph is not part of a space")
+    (cons, space)
+    ->Or_error.both
+    ->Or_error.flatMap(((cons, space)) =>
+      switch cons {
+      | [cons] =>
+        (cons, space, targetSpace)
+        ->_transfer
+        ->Rpc.Response.map(fromOruga(_, ~space=targetSpace))
+        ->Rpc.Response.map(cons =>
+          cons->Or_error.map(cons => {
+            ...cons,
+            metadata: {
+              ...cons.metadata,
+              name: "TRANSFERRED " ++ t.metadata.name ++ " INTO " ++ targetSpace,
+            },
+          })
+        )
+        ->Or_error.create
+      | _ => Or_error.error_s("Structure graph is not a construction.")
+      }
+    )
+  }
 }
 
 type t = {
@@ -578,6 +685,8 @@ let constructions = t =>
     t.constructions->Gid.Map.get(id)->Option.map(c => (id, UndoRedo.state(c)))->Option.getExn
   )
 let construction = (t, id) => t.constructions->Gid.Map.get(id)->Option.map(UndoRedo.state)
+let pathForConstruction = (t, id) =>
+  t.order->FileTree.getFilePathAndPosition(id' => id == id')->Option.map(fst)
 let spaces = t => t.spaces
 let typeSystems = t => t.typeSystems
 let getSpace = (t, name) => t.spaces->String.Map.get(name)

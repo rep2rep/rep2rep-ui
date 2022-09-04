@@ -44,8 +44,14 @@ type t
 
 let hash: t => Hash.t
 
-let duplicate: (t, Gid.Map.t<Gid.t>) => t
 let empty: t
+let layout: (
+  ~tokens: Gid.Map.t<TokenData.t>,
+  ~constructors: Gid.Map.t<ConstructorData.t>,
+  ~edges: Gid.Map.t<EdgeData.t>,
+) => t
+
+let duplicate: (t, Gid.Map.t<Gid.t>) => t
 let data: t => ReactD3Graph.Data.t<[#token | #constructor], unit>
 let selection: t => Selection.t
 

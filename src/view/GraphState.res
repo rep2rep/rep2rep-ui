@@ -513,6 +513,35 @@ let incidentLinks = (t, ~nodeId) => {
   {"in": inLinks, "out": outLinks}
 }
 
+let layout = (~tokens, ~constructors, ~edges) => {
+  Js.Console.log("LAYOUT NOT WORKING YET")
+  let tokNodes =
+    tokens
+    ->Gid.Map.toArray
+    ->Array.map(((id, data)) => GraphNode.create(id, ~x=0., ~y=0., GraphNode.Token(data)))
+  let consNodes =
+    constructors
+    ->Gid.Map.toArray
+    ->Array.map(((id, data)) => GraphNode.create(id, ~x=0., ~y=0., GraphNode.Constructor(data)))
+  let nodes = Array.concat(tokNodes, consNodes)
+  let links =
+    edges
+    ->Gid.Map.toArray
+    ->Array.map(((id, data)) =>
+      GraphLink.create(
+        id,
+        ~source=data.EdgeData.source,
+        ~target=data.EdgeData.target,
+        ~edgeData=data,
+      )
+    )
+  {
+    nodes: nodes,
+    links: links,
+    selection: Selection.empty,
+  }
+}
+
 module Stable = {
   module V1 = {
     type t = t = {

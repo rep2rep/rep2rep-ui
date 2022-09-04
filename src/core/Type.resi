@@ -9,6 +9,7 @@ let name: typ => string
 let any: typ
 let equal: (typ, typ) => bool
 let join: array<typ> => typ
+let split: typ => array<typ>
 
 let context: (typ, ~typeSystem: string) => Rpc.Response.t<array<(typ, typ)>>
 

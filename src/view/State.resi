@@ -32,9 +32,13 @@ module Construction: {
   let deleteNode: (t, Gid.t) => t
   let deleteLink: (t, Gid.t) => t
   let setSelection: (t, GraphState.Selection.t) => t
-  let toOruga: t => Or_error.t<array<Constructions.construction>>
   let getNode: (t, Gid.t) => option<[#token(TokenData.t) | #constructor(ConstructorData.t)]>
   let getLink: (t, Gid.t) => option<EdgeData.t>
+
+  let toOruga: t => Or_error.t<array<Constructions.construction>>
+  let fromOruga: (array<Constructions.construction>, ~space: string) => Or_error.t<t>
+
+  let transfer: (t, ~targetSpace: string) => Or_error.t<Rpc.Response.t<Or_error.t<t>>>
 
   module Stable: {
     module V1: {
@@ -53,6 +57,7 @@ let empty: t
 let focused: t => option<Gid.t>
 let constructions: t => FileTree.t<(Gid.t, Construction.t)>
 let construction: (t, Gid.t) => option<Construction.t>
+let pathForConstruction: (t, Gid.t) => option<FileTree.Path.t>
 let spaces: t => String.Map.t<CSpace.conSpec>
 let getSpace: (t, string) => option<CSpace.conSpec>
 let typeSystems: t => String.Map.t<FiniteSet.t<Type.PrincipalType.t>>

@@ -19,6 +19,9 @@ let conSpec_rpc: Rpc.Datatype.t<conSpec>
 let conSpec_toJson: conSpec => Js.Json.t
 let conSpec_fromJson: Js.Json.t => Or_error.t<conSpec>
 
+let tokenName: token => string
+let tokenType: token => Type.typ
+
 let constructorName: constructor => string
 let constructorSignature: constructor => ctyp
 

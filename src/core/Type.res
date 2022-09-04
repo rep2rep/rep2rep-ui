@@ -10,6 +10,7 @@ let name = t => t
 let any = ""
 let equal = (t, t') => t == t'
 let join = ts => ts->Array.joinWith(":")
+let split = t => t->String.split(":")
 
 let context_ = Rpc_service.require(
   "server.getTypeContext",
