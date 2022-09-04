@@ -514,7 +514,69 @@ let incidentLinks = (t, ~nodeId) => {
 }
 
 let layout = (~tokens, ~constructors, ~edges) => {
-  Js.Console.log("LAYOUT NOT WORKING YET")
+  let toposort = arrows => {
+    let sources = arrows->Array.reduce(Gid.Set.empty, (set, (a, _)) => set->Gid.Set.add(a))
+    let targets = arrows->Array.reduce(Gid.Set.empty, (set, (_, b)) => set->Gid.Set.add(b))
+    // Any subtype that is also a subtype has incoming arrows, so it's not a leaf.
+    let leaves = Gid.Set.diff(sources, targets)->Gid.Set.toArray
+    let arrows = ref(arrows)
+    let result = []
+    while leaves != [] {
+      let focus = leaves->Js.Array2.shift->Option.getExn
+      result->Js.Array2.push(focus)->ignore
+      let (outgoing, other) = arrows.contents->Array.partition(((src, _)) => src === focus)
+      arrows := other
+      outgoing->Array.forEach(((_, target)) =>
+        if other->Array.every(((_, tgt)) => target !== tgt) {
+          leaves->Js.Array2.push(target)->ignore
+        }
+      )
+    }
+    Js.Array2.reverseInPlace(result)->ignore
+    result
+  }
+
+  let layerize = (toposort, arrows) => {
+    let layers = ref(Gid.Map.empty())
+    // All are initially on layer 0
+    toposort->Array.forEach(id => {layers := layers.contents->Gid.Map.set(id, 0)})
+    toposort->Array.forEach(id => {
+      // For the i-th element in the toposorted ids, we find all incoming arrows
+      let sources = arrows->Array.keepMap(((a, b)) =>
+        if b == id {
+          Some(a)
+        } else {
+          None
+        }
+      )
+      // Assume the ith id has layer l, and the layer of the target id is m.
+      let current_layer = layers.contents->Gid.Map.get(id)->Option.getExn
+      sources->Array.forEach(src => {
+        layers :=
+          layers.contents->Gid.Map.update(
+            src,
+            Option.map(
+              _,
+              // If the m <= l, m := l + 1
+              layer =>
+                if layer <= current_layer {
+                  current_layer + 1
+                } else {
+                  layer
+                },
+            ),
+          )
+      })
+    })
+    // Group the ids into their layers.
+    let n_layers = 1 + layers.contents->Gid.Map.values->Array.reduce(0, Int.max)
+    let result = Array.make(n_layers, None)->Array.map(_ => [])
+    layers.contents->Gid.Map.forEach((id, l) =>
+      result[l]->Option.getExn->Js.Array2.push(id)->ignore
+    )
+    result
+  }
+
   let tokNodes =
     tokens
     ->Gid.Map.toArray
@@ -535,6 +597,25 @@ let layout = (~tokens, ~constructors, ~edges) => {
         ~edgeData=data,
       )
     )
+  let arrows = links->Array.map(ed => (GraphLink.source(ed), GraphLink.target(ed)))
+  let layers = arrows->toposort->layerize(arrows)
+
+  let nodes = layers->Array.reduceWithIndex(nodes, (nodes, ids, layer) => {
+    ids->Array.reduceWithIndex(nodes, (nodes, id, dx) =>
+      nodes->Array.map(nd =>
+        if GraphNode.id(nd) == id {
+          nd->GraphNode.move(
+            // This is a really crappy layout algorithm for the x-coordinate but it'll do for now
+            ~x=100.0 *. Int.toFloat(dx) +. Int.toFloat(mod(layer, 2) * 60),
+            ~y=100. *. Int.toFloat(layer),
+          )
+        } else {
+          nd
+        }
+      )
+    )
+  })
+
   {
     nodes: nodes,
     links: links,
