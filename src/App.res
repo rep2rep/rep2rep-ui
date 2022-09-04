@@ -83,7 +83,24 @@ module App = {
       dispatch(Event.NewConstruction(Gid.create(), "Structure graph", path))
     let deleteConstruction = id => dispatch(Event.DeleteConstruction(id))
     let focusConstruction = id => dispatch(Event.FocusConstruction(id))
-    let duplicateConstruction = id => dispatch(Event.DuplicateConstruction(id, Gid.create()))
+    let duplicateConstruction = id => {
+      let newId = Gid.create()
+      let newName =
+        state
+        ->State.construction(id)
+        ->Option.map(c =>
+          c->State.Construction.metadata->State.Construction.Metadata.name ++ " (Copy)"
+        )
+      dispatch(Event.DuplicateConstruction(id, newId))
+      newName->Option.iter(newName =>
+        dispatch(
+          Event.ConstructionEvent(
+            newId,
+            Event.Construction.UpdateMetadata(Event.Construction.Metadata.Name(newName)),
+          ),
+        )
+      )
+    }
     let renameConstruction = (id, newName) =>
       dispatch(
         Event.ConstructionEvent(
