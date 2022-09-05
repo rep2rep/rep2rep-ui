@@ -183,7 +183,6 @@ module App = {
                   let consId = Gid.create()
                   let path =
                     state->State.pathForConstruction(id)->Option.getWithDefault(FileTree.Path.root)
-                  Js.Console.log(newConstruction)
                   dispatch(Event.ImportConstruction(consId, newConstruction, path))
                 }),
             ),
