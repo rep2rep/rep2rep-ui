@@ -175,16 +175,13 @@ module App = {
           construction
           ->State.Construction.transfer(~targetSpace)
           ->Or_error.iter(
-            Rpc.Response.upon(
-              _,
-              // TODO: Add the construction to the file list!
-              newConstruction =>
-                newConstruction->Or_error.iter(newConstruction => {
-                  let consId = Gid.create()
-                  let path =
-                    state->State.pathForConstruction(id)->Option.getWithDefault(FileTree.Path.root)
-                  dispatch(Event.ImportConstruction(consId, newConstruction, path))
-                }),
+            Rpc.Response.upon(_, newConstruction =>
+              newConstruction->Or_error.iter(newConstruction => {
+                let consId = Gid.create()
+                let path =
+                  state->State.pathForConstruction(id)->Option.getWithDefault(FileTree.Path.root)
+                dispatch(Event.ImportConstruction(consId, newConstruction, path))
+              })
             ),
           )
         )
