@@ -793,7 +793,6 @@ module App = {
               )
             )
             ->Option.getWithDefault(Inspector.Data.Nothing)}
-            nodeIds={selection->GraphState.Selection.nodes}
           />
         </div>
       </div>

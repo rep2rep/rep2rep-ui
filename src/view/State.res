@@ -556,7 +556,7 @@ module Construction = {
           }
         }
         switch tokenData.contents->Gid.Map.get(tid) {
-        | Some(td) => () // Already added, we're fine!
+        | Some(_) => () // Already added, we're fine!
         | None => {
             let (type_, subtype) = readOrugaType(ttyp)
             let td = TokenData.create(~type_?, ~subtype?, tname)
