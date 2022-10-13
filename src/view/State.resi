@@ -71,15 +71,15 @@ let loadRenderers: t => Rpc.Response.t<t>
 let setDB: (IndexedDB.t, string) => unit
 
 let store: t => unit
-let load: unit => Promise.t<option<t>>
+let load: (~atTime: float) => Promise.t<option<t>>
 
-let newConstruction: (t, Gid.t, string, FileTree.Path.t) => t
+let newConstruction: (t, Gid.t, string, FileTree.Path.t, ~atTime: float) => t
 let deleteConstruction: (t, Gid.t) => t
 let focusConstruction: (t, option<Gid.t>) => t
-let duplicateConstruction: (t, ~oldId: Gid.t, ~newId: Gid.t) => t
+let duplicateConstruction: (t, ~oldId: Gid.t, ~newId: Gid.t, ~atTime: float) => t
 let reorderConstructions: (t, FileTree.t<Gid.t>) => t
-let importConstruction: (t, Gid.t, Construction.t, FileTree.Path.t) => t
-let updateConstruction: (t, Gid.t, Construction.t => Construction.t) => t
+let importConstruction: (t, Gid.t, Construction.t, FileTree.Path.t, ~atTime: float) => t
+let updateConstruction: (t, Gid.t, Construction.t => Construction.t, ~atTime: float) => t
 let updateConstructionBypassingUndoRedo: (t, Gid.t, Construction.t => Construction.t) => t
 
 let newFolder: (t, Gid.t, string, FileTree.Path.t) => t

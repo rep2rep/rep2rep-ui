@@ -107,21 +107,22 @@ type t =
   | Redo(Gid.t)
   | ConstructionEvent(Gid.t, Construction.t)
 
-let dispatch = (state, t) =>
+let dispatch = (state, t, ~atTime) =>
   switch t {
   | Update(s) => s
-  | NewConstruction(id, name, path) => state->State.newConstruction(id, name, path)
+  | NewConstruction(id, name, path) => state->State.newConstruction(id, name, path, ~atTime)
   | DeleteConstruction(id) => state->State.deleteConstruction(id)
   | FocusConstruction(id) => state->State.focusConstruction(id)
-  | DuplicateConstruction(oldId, newId) => state->State.duplicateConstruction(~oldId, ~newId)
+  | DuplicateConstruction(oldId, newId) =>
+    state->State.duplicateConstruction(~oldId, ~newId, ~atTime)
   | ReorderConstructions(order) => state->State.reorderConstructions(order)
   | ImportConstruction(id, construction, path) =>
-    state->State.importConstruction(id, construction, path)
+    state->State.importConstruction(id, construction, path, ~atTime)
   | NewFolder(id, name, path) => state->State.newFolder(id, name, path)
   | RenameFolder(id, name) => state->State.renameFolder(id, name)
   | DeleteFolder(id) => state->State.deleteFolder(id)
   | Undo(id) => state->State.undo(id)
   | Redo(id) => state->State.redo(id)
   | ConstructionEvent(id, event) =>
-    state->State.updateConstruction(id, Construction.dispatch(_, event))
+    state->State.updateConstruction(id, Construction.dispatch(_, event), ~atTime)
   }

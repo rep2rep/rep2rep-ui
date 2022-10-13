@@ -1,3 +1,7 @@
+type performance
+@val external performance: performance = "performance"
+@send external perfNow: performance => float = "now"
+
 module BoolStore = LocalStorage.MakeJsonable(Bool)
 module K = GlobalKeybindings.KeyBinding
 module FP = {
@@ -18,10 +22,11 @@ module App = {
   })
   let init =
     db_ready
-    ->Promise.then(_ => State.load())
+    ->Promise.then(_ => State.load(~atTime=perfNow(performance)))
     ->Promise.thenResolve(s => s->Option.getWithDefault(State.empty))
   let reducer = (state, action) => {
-    let newState = Event.dispatch(state, action)
+    let atTime = perfNow(performance)
+    let newState = Event.dispatch(state, action, ~atTime)
     State.store(newState)
     newState
   }

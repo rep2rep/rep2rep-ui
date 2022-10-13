@@ -729,7 +729,7 @@ let loadRenderers = t =>
 
 let setDB = (newDB, store) => db->SetOnce.set((newDB, store))
 
-let load = () => {
+let load = (~atTime) => {
   let focused = LocalStorage.Raw.getItem("RST:Focused")->Option.flatMap(s => {
     let json = try Or_error.create(Js.Json.parseExn(s)) catch {
     | _ => Or_error.error_s("Badly stored Focused")
@@ -755,7 +755,7 @@ let load = () => {
         arr
         ->Array.keepMap(((id, model)) =>
           switch model->Or_error.match {
-          | Or_error.Ok(m) => (id, UndoRedo.create(m))->Some
+          | Or_error.Ok(m) => (id, UndoRedo.create(m, ~atTime))->Some
           | Or_error.Err(e) => {
               Dialog.alert(
                 "Error loading construction: " ++ Error.messages(e)->Js.Array2.joinWith(";"),
@@ -793,8 +793,8 @@ let store = t => {
   )
 }
 
-let newConstruction = (t, id, name, path) => {
-  let c = Construction.create(name)->UndoRedo.create
+let newConstruction = (t, id, name, path, ~atTime) => {
+  let c = Construction.create(name)->UndoRedo.create(~atTime)
   {
     ...t,
     focused: Some(id),
@@ -822,7 +822,7 @@ let deleteConstruction = (t, id) => {
 
 let focusConstruction = (t, id) => {...t, focused: id}
 
-let duplicateConstruction = (t, ~oldId, ~newId) => {
+let duplicateConstruction = (t, ~oldId, ~newId, ~atTime) => {
   let (path, position) = t.order->FileTree.getFilePathAndPosition(id => id === oldId)->Option.getExn
   t
   ->construction(oldId)
@@ -831,15 +831,15 @@ let duplicateConstruction = (t, ~oldId, ~newId) => {
     ...t,
     focused: Some(newId),
     order: t.order->FileTree.insertFile(~path, ~position=position + 1, newId)->Option.getExn,
-    constructions: t.constructions->Gid.Map.set(newId, UndoRedo.create(construction)),
+    constructions: t.constructions->Gid.Map.set(newId, UndoRedo.create(construction, ~atTime)),
   })
   ->Option.getWithDefault(t)
 }
 
 let reorderConstructions = (t, order) => {...t, order: order}
 
-let importConstruction = (t, id, construction, path) => {
-  let c = Construction.duplicate(construction)->UndoRedo.create
+let importConstruction = (t, id, construction, path, ~atTime) => {
+  let c = Construction.duplicate(construction)->UndoRedo.create(~atTime)
   {
     ...t,
     focused: Some(id),
@@ -848,14 +848,14 @@ let importConstruction = (t, id, construction, path) => {
   }
 }
 
-let updateConstruction = (t, id, f) => {
+let updateConstruction = (t, id, f, ~atTime) => {
   ...t,
   constructions: t.constructions->Gid.Map.update(
     id,
     Option.map(_, ur_construction => {
       let c = UndoRedo.state(ur_construction)
       let c' = f(c)
-      ur_construction->UndoRedo.step(c')
+      ur_construction->UndoRedo.step(c', ~atTime)
     }),
   ),
 }
