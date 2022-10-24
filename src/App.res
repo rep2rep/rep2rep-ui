@@ -28,6 +28,18 @@ module App = {
     let atTime = perfNow(performance)
     let newState = Event.dispatch(state, action, ~atTime)
     State.store(newState)
+    if Event.shouldTriggerIntelligence(action) {
+      newState
+      ->State.focused
+      ->Option.flatMap(State.construction(newState, _))
+      ->Option.map(State.Construction.typeCheck)
+      ->Option.iter(o =>
+        switch o->Or_error.match {
+        | Or_error.Ok(r) => r->Rpc.Response.upon(Js.Console.log)
+        | Or_error.Err(e) => Js.Console.log(e)
+        }
+      )
+    }
     newState
   }
 

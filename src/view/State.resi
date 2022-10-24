@@ -38,6 +38,7 @@ module Construction: {
   let toOruga: t => Or_error.t<array<Constructions.construction>>
   let fromOruga: (array<Constructions.construction>, ~space: string) => Or_error.t<t>
 
+  let typeCheck: t => Or_error.t<Rpc.Response.t<Result.t<unit, array<Diagnostic.t>>>>
   let transfer: (t, ~targetSpace: string) => Or_error.t<Rpc.Response.t<Or_error.t<t>>>
 
   module Stable: {

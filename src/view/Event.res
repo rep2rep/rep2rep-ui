@@ -12,6 +12,14 @@ module Token = {
     | Subtype(s) => {...token, subtype: s}
     | Notes(n) => {...token, TokenData.notes: n}
     }
+
+  let shouldTriggerIntelligence = t =>
+    switch t {
+    | Type(_)
+    | Subtype(_) => true
+    | Label(_)
+    | Notes(_) => false
+    }
 }
 
 module Constructor = {
@@ -24,6 +32,12 @@ module Constructor = {
     | Constructor(l) => {...constructor, ConstructorData.constructor: l}
     | Notes(n) => {...constructor, ConstructorData.notes: n}
     }
+
+  let shouldTriggerIntelligence = t =>
+    switch t {
+    | Constructor(_) => true
+    | Notes(_) => false
+    }
 }
 
 module Edge = {
@@ -35,6 +49,12 @@ module Edge = {
     switch t {
     | Value(v) => edge->EdgeData.setPayload(v)
     | Notes(n) => edge->EdgeData.setNotes(n)
+    }
+
+  let shouldTriggerIntelligence = t =>
+    switch t {
+    | Value(_) => true
+    | Notes(_) => false
     }
 }
 
@@ -90,6 +110,25 @@ module Construction = {
       construction->State.Construction.updateEdge(id, ed => ed->Edge.dispatch(ev))
     | Replace(c2) => c2
     }
+
+  let rec shouldTriggerIntelligence = t =>
+    switch t {
+    | Multiple(ts) => ts->Array.some(shouldTriggerIntelligence)
+    | SetSpace(_)
+    | AddToken(_, _, _)
+    | AddConstructor(_, _, _)
+    | DuplicateNode(_, _)
+    | ConnectNodes(_, _, _)
+    | DeleteNode(_)
+    | DeleteLink(_)
+    | Replace(_) => true
+    | MoveNode(_, _, _)
+    | ChangeSelection(_)
+    | UpdateMetadata(_) => false
+    | UpdateToken(_, e) => Token.shouldTriggerIntelligence(e)
+    | UpdateConstructor(_, e) => Constructor.shouldTriggerIntelligence(e)
+    | UpdateEdge(_, e) => Edge.shouldTriggerIntelligence(e)
+    }
 }
 
 type t =
@@ -125,4 +164,21 @@ let dispatch = (state, t, ~atTime) =>
   | Redo(id) => state->State.redo(id)
   | ConstructionEvent(id, event) =>
     state->State.updateConstruction(id, Construction.dispatch(_, event), ~atTime)
+  }
+
+let shouldTriggerIntelligence = t =>
+  switch t {
+  | Update(_)
+  | NewConstruction(_, _, _)
+  | DeleteConstruction(_)
+  | FocusConstruction(_)
+  | DuplicateConstruction(_, _)
+  | ImportConstruction(_, _, _)
+  | Undo(_)
+  | Redo(_) => true
+  | ReorderConstructions(_)
+  | NewFolder(_, _, _)
+  | RenameFolder(_, _)
+  | DeleteFolder(_) => false
+  | ConstructionEvent(_, e) => Construction.shouldTriggerIntelligence(e)
   }

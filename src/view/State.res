@@ -635,6 +635,25 @@ module Construction = {
       }
     )
   }
+
+  let _typeCheck = Rpc_service.require(
+    "core.construction.typeCheck",
+    Rpc.Datatype.tuple2_(String.t_rpc, Constructions.construction_rpc),
+    Result.t_rpc(Rpc.Datatype.unit_, Array.t_rpc(Diagnostic.t_rpc)),
+  )
+
+  let typeCheck = t => {
+    let construction = toOruga(t)
+    let space = t.space->Or_error.fromOption_s("Structure graph is not part of a space")
+    (space, construction)
+    ->Or_error.both
+    ->Or_error.map(((space, cons)) =>
+      cons
+      ->Array.map(cons => _typeCheck((space, cons)))
+      ->Rpc.Response.all
+      ->Rpc.Response.map(Result.allUnit(_, Array.concatMany))
+    )
+  }
 }
 
 type t = {
