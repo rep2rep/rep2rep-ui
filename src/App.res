@@ -27,7 +27,7 @@ module App = {
       s
       ->Option.map(s => {
         let isValid = if "##VERSION##"->String.endsWith("-DEV") {
-          State.isValid(newState)
+          State.isValid(s)
         } else {
           Result.Ok()
         }
