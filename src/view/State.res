@@ -927,15 +927,6 @@ let store = t => {
 }
 
 let isValid = t => {
-  let focusedValid = switch t.focused {
-  | None => Result.Ok()
-  | Some(id) =>
-    if t.constructions->Gid.Map.has(id) {
-      Result.Ok()
-    } else {
-      Result.Error(["Focusing on unknown structure graph: " ++ Gid.toString(id)])
-    }
-  }
   let orderValid =
     t.order
     ->FileTree.flatten
@@ -967,7 +958,7 @@ let isValid = t => {
       }
     )
     ->Result.allUnit(Array.concatMany)
-  [focusedValid, orderValid, constructionsValid]->Result.allUnit(Array.concatMany)
+  [orderValid, constructionsValid]->Result.allUnit(Array.concatMany)
 }
 
 let newConstruction = (t, id, name, path, ~atTime) => {
