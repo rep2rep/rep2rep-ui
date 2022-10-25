@@ -77,6 +77,8 @@ let duplicate = t => {
   notes: t.notes,
 }
 
+let isValid = _ => Result.Ok()
+
 let source = t => t.source
 let target = t => t.target
 let payload = t => t.payload

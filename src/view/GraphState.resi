@@ -9,6 +9,8 @@ module GraphNode: {
   let data: t => array<ReactD3Graph.Node.t<[#token | #constructor]>>
   let move: (t, ~x: float, ~y: float) => t
   let setData: (t, nodeData) => t
+  let id: t => Gid.t
+  let kind: t => [#token | #constructor]
 
   module Stable: {
     module V1: {
@@ -25,6 +27,7 @@ module GraphLink: {
   let create: (Gid.t, ~source: Gid.t, ~target: Gid.t, ~edgeData: EdgeData.t) => t
   let data: t => array<ReactD3Graph.Link.t<unit>>
   let setData: (t, EdgeData.t) => t
+  let id: t => Gid.t
 }
 
 module Selection: {
@@ -43,6 +46,7 @@ module Selection: {
 type t
 
 let hash: t => Hash.t
+let isValid: t => Result.t<unit, array<string>>
 
 let empty: t
 let layout: (
@@ -63,6 +67,10 @@ let deleteNode: (t, Gid.t) => t
 let deleteLink: (t, Gid.t) => t
 let setSelection: (t, Selection.t) => t
 let incidentLinks: (t, ~nodeId: Gid.t) => {"in": array<Gid.t>, "out": array<Gid.t>}
+let getNode: (t, Gid.t) => option<GraphNode.t>
+let getLink: (t, Gid.t) => option<GraphLink.t>
+let nodes: t => array<GraphNode.t>
+let links: t => array<GraphLink.t>
 
 module Stable: {
   module V1: {

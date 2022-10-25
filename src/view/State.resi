@@ -73,6 +73,7 @@ let setDB: (IndexedDB.t, string) => unit
 
 let store: t => unit
 let load: (~atTime: float) => Promise.t<option<t>>
+let isValid: t => Result.t<unit, array<string>>
 
 let newConstruction: (t, Gid.t, string, FileTree.Path.t, ~atTime: float) => t
 let deleteConstruction: (t, Gid.t) => t

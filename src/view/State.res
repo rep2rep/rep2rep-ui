@@ -59,6 +59,8 @@ module Construction = {
     let create = name => {name: name, notes: ""}
 
     let duplicate = t => {name: t.name, notes: t.notes}
+
+    let isValid = _ => Result.Ok()
   }
 
   type t = {
@@ -210,6 +212,119 @@ module Construction = {
     ),
     ("graph", GraphState.hash),
   )
+
+  let isValid = t => {
+    let metaValid = Metadata.isValid(t.metadata)
+    let spaceValid = Result.Ok()
+    let nodeValidator = (data, kind, validator) =>
+      data
+      ->Gid.Map.toArray
+      ->Array.map(((id, data)) => {
+        let valid = validator(data)
+        let graphHasNode =
+          t.graph
+          ->GraphState.getNode(id)
+          ->Option.map(node => GraphState.GraphNode.kind(node) == kind)
+          ->Option.getWithDefault(false)
+        if graphHasNode {
+          valid
+        } else {
+          [
+            Result.Error([(kind :> string) ++ " does not exist in graph: " ++ Gid.toString(id)]),
+            valid,
+          ]->Result.allUnit(Array.concatMany)
+        }
+      })
+      ->Result.allUnit(Array.concatMany)
+    let toksValid = nodeValidator(t.tokenData, #token, TokenData.isValid)
+    let consValid = nodeValidator(t.constructorData, #constructor, ConstructorData.isValid)
+    let edgeValid =
+      t.edgeData
+      ->Gid.Map.toArray
+      ->Array.map(((id, data)) => {
+        let validData = EdgeData.isValid(data)
+        let validSource = if (
+          t.tokenData->Gid.Map.has(EdgeData.source(data)) ||
+            t.constructorData->Gid.Map.has(EdgeData.source(data))
+        ) {
+          Result.Ok()
+        } else {
+          Result.Error([
+            "Edge (" ++
+            Gid.toString(id) ++
+            ") connects to unknown source: " ++
+            Gid.toString(EdgeData.source(data)),
+          ])
+        }
+        let validTarget = if (
+          t.tokenData->Gid.Map.has(EdgeData.target(data)) ||
+            t.constructorData->Gid.Map.has(EdgeData.target(data))
+        ) {
+          Result.Ok()
+        } else {
+          Result.Error([
+            "Edge (" ++
+            Gid.toString(id) ++
+            ") connects to unknown target: " ++
+            Gid.toString(EdgeData.target(data)),
+          ])
+        }
+        let graphHasLink = t.graph->GraphState.getLink(id)->Option.isSome
+        if graphHasLink {
+          [validData, validSource, validTarget]->Result.allUnit(Array.concatMany)
+        } else {
+          [
+            Result.Error(["Edge does not exist in graph: " ++ Gid.toString(id)]),
+            validData,
+            validSource,
+            validTarget,
+          ]->Result.allUnit(Array.concatMany)
+        }
+      })
+      ->Result.allUnit(Array.concatMany)
+    let graphValid = {
+      let nodesHaveData =
+        t.graph
+        ->GraphState.nodes
+        ->Array.map(node =>
+          if node->GraphState.GraphNode.kind == #token {
+            if t.tokenData->Gid.Map.has(node->GraphState.GraphNode.id) {
+              Result.Ok()
+            } else {
+              Result.Error([
+                "Graph token has no associated data: ",
+                Gid.toString(GraphState.GraphNode.id(node)),
+              ])
+            }
+          } else if t.constructorData->Gid.Map.has(node->GraphState.GraphNode.id) {
+            Result.Ok()
+          } else {
+            Result.Error([
+              "Graph constructor has no associated data: ",
+              Gid.toString(GraphState.GraphNode.id(node)),
+            ])
+          }
+        )
+        ->Result.allUnit(Array.concatMany)
+      let linksHaveData =
+        t.graph
+        ->GraphState.links
+        ->Array.map(link =>
+          if t.edgeData->Gid.Map.has(link->GraphState.GraphLink.id) {
+            Result.Ok()
+          } else {
+            Result.Error([
+              "Graph link has no associated data: " ++ Gid.toString(GraphState.GraphLink.id(link)),
+            ])
+          }
+        )
+        ->Result.allUnit(Array.concatMany)
+      [GraphState.isValid(t.graph), nodesHaveData, linksHaveData]->Result.allUnit(Array.concatMany)
+    }
+    [metaValid, spaceValid, toksValid, consValid, edgeValid, graphValid]->Result.allUnit(
+      Array.concatMany,
+    )
+  }
 
   let graph = t => t.graph
   let metadata = t => t.metadata
@@ -587,20 +702,19 @@ module Construction = {
         }
       traverseCons(con, None)
     })
+    let edgeData = edgeData.contents
+    let tokenData = tokenData.contents
+    let constructorData = constructorData.contents
     Or_error.create({
       metadata: {
         name: "Transformed construction",
         notes: "This construction is a result of applying structure transfer.",
       },
       space: Some(space),
-      tokenData: tokenData.contents,
-      constructorData: constructorData.contents,
-      edgeData: edgeData.contents,
-      graph: GraphState.layout(
-        ~tokens=tokenData.contents,
-        ~constructors=constructorData.contents,
-        ~edges=edgeData.contents,
-      ),
+      tokenData: tokenData,
+      constructorData: constructorData,
+      edgeData: edgeData,
+      graph: GraphState.layout(~tokens=tokenData, ~constructors=constructorData, ~edges=edgeData),
     })
   }
 
@@ -810,6 +924,50 @@ let store = t => {
   t.constructions->Gid.Map.forEach((id, construction) =>
     Construction.store(construction->UndoRedo.state, id)
   )
+}
+
+let isValid = t => {
+  let focusedValid = switch t.focused {
+  | None => Result.Ok()
+  | Some(id) =>
+    if t.constructions->Gid.Map.has(id) {
+      Result.Ok()
+    } else {
+      Result.Error(["Focusing on unknown structure graph: " ++ Gid.toString(id)])
+    }
+  }
+  let orderValid =
+    t.order
+    ->FileTree.flatten
+    ->Array.keepMap(id =>
+      if t.constructions->Gid.Map.has(id) {
+        None
+      } else {
+        Some(id)
+      }
+    )
+    ->(
+      arr =>
+        switch arr {
+        | [] => Result.Ok()
+        | ids =>
+          ids
+          ->Array.map(id => "FileTree references unknown structure graph: " ++ Gid.toString(id))
+          ->Result.Error
+        }
+    )
+  let constructionsValid =
+    t.constructions
+    ->Gid.Map.toArray
+    ->Array.map(((id, cons)) =>
+      if t.order->FileTree.flatten->Array.includes(id) {
+        cons->UndoRedo.state->Construction.isValid
+      } else {
+        Result.Error(["Construction found that is not in FileTree: " ++ Gid.toString(id)])
+      }
+    )
+    ->Result.allUnit(Array.concatMany)
+  [focusedValid, orderValid, constructionsValid]->Result.allUnit(Array.concatMany)
 }
 
 let newConstruction = (t, id, name, path, ~atTime) => {

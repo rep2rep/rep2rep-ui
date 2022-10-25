@@ -14,6 +14,12 @@ module GraphNode = {
 
   type t = (ReactD3Graph.Node.t<[#token | #constructor]>, nodeData)
 
+  let isValid = ((_, d)) =>
+    switch d {
+    | Token(d) => TokenData.isValid(d)
+    | Constructor(d) => ConstructorData.isValid(d)
+    }
+
   let hash = ((node, data)) => {
     let id = ReactD3Graph.Node.id(node)->toGid
     let x = ReactD3Graph.Node.x(node)
@@ -125,6 +131,11 @@ module GraphNode = {
     }
     (ReactD3Graph.Node.updateConfig(t, _ => config), newPayload)
   }
+  let kind = ((_, d)) =>
+    switch d {
+    | Token(_) => #token
+    | Constructor(_) => #constructor
+    }
 
   module Stable = {
     module V1 = {
@@ -206,6 +217,42 @@ module GraphNode = {
 
 module GraphLink = {
   type t = (ReactD3Graph.Link.t<unit>, EdgeData.t)
+
+  let isValid = ((l, d)) => {
+    let dataValid = EdgeData.isValid(d)
+    let id =
+      ReactD3Graph.Link.id(l)->Option.map(ReactD3Graph.Link.Id.toString)->Option.map(Gid.fromString)
+    let idValid = if id->Option.isSome {
+      Result.Ok()
+    } else {
+      Result.Error(["Link has no ID!"])
+    }
+    let sourceValid = if l->ReactD3Graph.Link.source->toGid == EdgeData.source(d) {
+      Result.Ok()
+    } else {
+      Result.Error([
+        "Link (" ++
+        id->Option.map(Gid.toString)->Option.getWithDefault("<NO_LINK_ID>") ++
+        ") sources do not match between graph and data: " ++
+        l->ReactD3Graph.Link.source->toGid->Gid.toString ++
+        " vs " ++
+        EdgeData.source(d)->Gid.toString,
+      ])
+    }
+    let targetValid = if l->ReactD3Graph.Link.target->toGid == EdgeData.target(d) {
+      Result.Ok()
+    } else {
+      Result.Error([
+        "Link (" ++
+        id->Option.map(Gid.toString)->Option.getWithDefault("<NO_LINK_ID>") ++
+        ") targets do not match between graph and data: " ++
+        l->ReactD3Graph.Link.target->toGid->Gid.toString ++
+        " vs " ++
+        EdgeData.target(d)->Gid.toString,
+      ])
+    }
+    [dataValid, idValid, sourceValid, targetValid]->Result.allUnit(Array.concatMany)
+  }
 
   let hash = ((link, data)) => {
     let source = ReactD3Graph.Link.source(link)->toGid
@@ -331,11 +378,12 @@ module GraphLink = {
     ReactD3Graph.Link.id(t)->Option.getExn->ReactD3Graph.Link.Id.toString->Gid.fromString
   let source = ((t, _)) => ReactD3Graph.Link.source(t)->toGid
   let target = ((t, _)) => ReactD3Graph.Link.target(t)->toGid
-  let duplicate = ((t, p), newSource, newTarget) => (
+  let duplicate = ((t, p), newId, newSource, newTarget) => (
     t
+    ->ReactD3Graph.Link.setId(newId->Gid.toString->ReactD3Graph.Link.Id.ofString)
     ->ReactD3Graph.Link.setSource(newSource->fromGid)
     ->ReactD3Graph.Link.setTarget(newTarget->fromGid),
-    p,
+    p->EdgeData.setSource(newSource)->EdgeData.setTarget(newTarget),
   )
   let setData = ((t, _), newPayload) => {
     let config = makeConfig(newPayload)
@@ -443,15 +491,50 @@ let empty = {
   selection: Selection.empty,
 }
 
+let nodes = t => t.nodes
+let links = t => t.links
+
+let isValid = t => {
+  let nodesValid = t.nodes->Array.map(GraphNode.isValid)->Result.allUnit(Array.concatMany)
+  let linksValid = t.links->Array.map(GraphLink.isValid)->Result.allUnit(Array.concatMany)
+  let selectionValid = {
+    let nodesValid =
+      t.selection
+      ->Selection.nodes
+      ->Array.map(id =>
+        if t.nodes->Array.some(node => GraphNode.id(node) == id) {
+          Result.Ok()
+        } else {
+          Result.Error(["Selection references unknown node: " ++ Gid.toString(id)])
+        }
+      )
+      ->Result.allUnit(Array.concatMany)
+    let linksValid =
+      t.selection
+      ->Selection.links
+      ->Array.map(id =>
+        if t.links->Array.some(link => GraphLink.id(link) == id) {
+          Result.Ok()
+        } else {
+          Result.Error(["Selection references unknown link: " ++ Gid.toString(id)])
+        }
+      )
+      ->Result.allUnit(Array.concatMany)
+    [nodesValid, linksValid]->Result.allUnit(Array.concatMany)
+  }
+  [nodesValid, linksValid, selectionValid]->Result.allUnit(Array.concatMany)
+}
+
 let duplicate = (t, idMap) => {
   nodes: t.nodes->Array.map(node => {
     let id = idMap->Gid.Map.get(GraphNode.id(node))->Option.getExn
     node->GraphNode.duplicate(id)
   }),
   links: t.links->Array.map(link => {
+    let id = idMap->Gid.Map.get(GraphLink.id(link))->Option.getExn
     let source = idMap->Gid.Map.get(GraphLink.source(link))->Option.getExn
     let target = idMap->Gid.Map.get(GraphLink.target(link))->Option.getExn
-    link->GraphLink.duplicate(source, target)
+    link->GraphLink.duplicate(id, source, target)
   }),
   selection: Selection.empty,
 }
@@ -512,6 +595,9 @@ let incidentLinks = (t, ~nodeId) => {
   })
   {"in": inLinks, "out": outLinks}
 }
+
+let getNode = (t, nodeId) => t.nodes->Array.find(node => GraphNode.id(node) == nodeId)
+let getLink = (t, linkId) => t.links->Array.find(link => GraphLink.id(link) == linkId)
 
 let layout = (~tokens, ~constructors, ~edges) => {
   let toposort = arrows => {

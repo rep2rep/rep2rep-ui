@@ -121,6 +121,8 @@ let hash: t => Hash.t = Hash.record5(
   ("notes", String.hash),
 )
 
+let isValid = _ => Result.Ok()
+
 let setPayload = (t, payload) => {...t, payload: payload}
 
 let size = t =>

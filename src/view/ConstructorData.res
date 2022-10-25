@@ -54,6 +54,7 @@ let duplicate = t => {
   constructor: t.constructor,
   notes: t.notes,
 }
+let isValid = _ => Result.Ok()
 
 let hash_constructor = con => {
   let name = CSpace.constructorName(con)
