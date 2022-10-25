@@ -26,7 +26,11 @@ module App = {
     ->Promise.thenResolve(s =>
       s
       ->Option.map(s => {
-        let isValid = State.isValid(s)
+        let isValid = if "##VERSION##"->String.endsWith("-DEV") {
+          State.isValid(newState)
+        } else {
+          Result.Ok()
+        }
         if isValid->Result.isError {
           Dialog.alert("State is starting invalid, oh no!")
           Js.Console.log2(s, isValid)
