@@ -488,23 +488,26 @@ module App = {
       })
 
     let deleteSelection = _ => {
-      selection
-      ->GraphState.Selection.nodes
-      ->Array.forEach(nodeId => {
-        focused
-        ->Option.flatMap(State.construction(state, _))
-        ->Option.map(State.Construction.graph)
-        ->Option.map(GraphState.incidentLinks(_, ~nodeId))
-        ->Option.map(o => Array.concat(o["in"], o["out"]))
-        ->Option.iter(Array.forEach(_, linkId => dispatchC(Event.Construction.DeleteLink(linkId))))
-        dispatchC(Event.Construction.DeleteNode(nodeId))
-      })
+      let ds =
+        selection
+        ->GraphState.Selection.nodes
+        ->Array.flatMap(nodeId => {
+          let ds =
+            focused
+            ->Option.flatMap(State.construction(state, _))
+            ->Option.map(State.Construction.graph)
+            ->Option.map(GraphState.incidentLinks(_, ~nodeId))
+            ->Option.map(o => Array.concat(o["in"], o["out"]))
+            ->Option.map(Array.map(_, linkId => Event.Construction.DeleteLink(linkId)))
+            ->Option.getWithDefault([])
+          Array.concatMany([ds, [Event.Construction.DeleteNode(nodeId)]])
+        })
       let es =
         selection
         ->GraphState.Selection.links
         ->Array.map(linkId => Event.Construction.DeleteLink(linkId))
       let unselect = Event.Construction.ChangeSelection(GraphState.Selection.empty)
-      dispatchC(Event.Construction.Multiple(Array.concat(es, [unselect])))
+      dispatchC(Event.Construction.Multiple(Array.concatMany([ds, es, [unselect]])))
     }
 
     let movedNode = (id, ~x, ~y) =>
