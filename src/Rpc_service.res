@@ -7,6 +7,9 @@
 // rather than
 //     Rpc.require (Rpc_service.t, "foo", Foo.t_rpc, Bar.t_rpc)
 
-// let t = Rpc.create(~host="rep2rep.cl.cam.ac.uk", ~port=80, ~path=Some("/api"))
-let t = Rpc.create(~host="127.0.0.1", ~port=12345, ~path=None)
+let t = if "##VERSION##"->String.endsWith("-DEV") {
+  Rpc.create(~host="127.0.0.1", ~port=12345, ~path=None)
+} else {
+  Rpc.create(~host="rep2rep.cl.cam.ac.uk", ~port=80, ~path=Some("/api"))
+}
 let require = (name, intype, outtype, data) => Rpc.require(t, name, intype, outtype, data)
