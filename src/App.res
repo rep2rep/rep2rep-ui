@@ -8,6 +8,23 @@ module FP = {
   include FilePanel
   let make = React.memo(make)
 }
+module NativeEvent: {
+  type t<'a>
+  let create: (string, 'a) => t<'a>
+  let listen: (string, 'a => unit) => unit
+  let dispatch: t<'a> => unit
+} = {
+  type window
+  @val external window: window = "window"
+  type t<'a>
+  @new external _create: (string, {"detail": 'a}) => t<'a> = "CustomEvent"
+  @send external _addEventListener: (window, string, t<'a> => unit) => unit = "addEventListener"
+  @send external _dispatchEvent: (window, t<'a>) => unit = "dispatchEvent"
+  @get external detail: t<'a> => 'a = "detail"
+  let create = (name, payload) => _create(name, {"detail": payload})
+  let listen = (name, callback) => window->_addEventListener(name, t => t->detail->callback)
+  let dispatch = t => window->_dispatchEvent(t)
+}
 
 module App = {
   let db_store = "RST"
@@ -52,8 +69,19 @@ module App = {
       intelTimeout := Js.Global.setTimeout(() => {
           let result = State.Construction.typeCheck(cons)
           switch result->Or_error.match {
-          | Or_error.Ok(r) => r->Rpc.Response.upon(Js.Console.log)
-          | Or_error.Err(e) => Js.Console.log(e)
+          | Or_error.Ok(r) =>
+            r->Rpc.Response.upon(res =>
+              NativeEvent.create("intelligence", res)->NativeEvent.dispatch
+            )
+          | Or_error.Err(e) =>
+            e
+            ->Error.toString
+            // TODO: Get the ID's from the error? Or produce diagnostics by default?
+            ->Diagnostic.create(Diagnostic.Kind.Error, _, [])
+            ->Array.singleton
+            ->Result.Error
+            ->NativeEvent.create("intelligence", _)
+            ->NativeEvent.dispatch
           }
         }, 500)->Some
     })
@@ -118,6 +146,11 @@ module App = {
       ->Rpc.Response.upon(state => {
         dispatch(Event.Update(state))
       })
+      None
+    })
+
+    React.useEffect0(() => {
+      NativeEvent.listen("intelligence", Js.Console.log)
       None
     })
 
