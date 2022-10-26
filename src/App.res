@@ -11,17 +11,17 @@ module FP = {
 
 module App = {
   let db_store = "RST"
-  let db_ready = IndexedDB.open_(~name="rst", ~version=1, ~onUpgradeNeeded=db =>
-    db->IndexedDB.createObjectStore(db_store)
-  )->Promise.thenResolve(db => {
-    db->IndexedDB.onError(e => {
-      Js.Console.log(e)
-      Dialog.alert("Database Error!")
-    })
-    State.setDB(db, db_store)
-  })
   let init =
-    db_ready
+    IndexedDB.open_(~name="rst", ~version=1, ~onUpgradeNeeded=db =>
+      db->IndexedDB.createObjectStore(db_store)
+    )
+    ->Promise.thenResolve(db => {
+      db->IndexedDB.onError(e => {
+        Js.Console.log(e)
+        Dialog.alert("Database Error!")
+      })
+      State.setDB(db, db_store)
+    })
     ->Promise.then(_ => State.load(~atTime=perfNow(performance)))
     ->Promise.thenResolve(s =>
       s
@@ -41,6 +41,24 @@ module App = {
       })
       ->Option.getWithDefault(State.empty)
     )
+
+  let intelTimeout = ref(None)
+  let sendToIntelligence = state => {
+    intelTimeout.contents->Option.iter(Js.Global.clearTimeout)
+    state
+    ->State.focused
+    ->Option.flatMap(State.construction(state, _))
+    ->Option.iter(cons => {
+      intelTimeout := Js.Global.setTimeout(() => {
+          let result = State.Construction.typeCheck(cons)
+          switch result->Or_error.match {
+          | Or_error.Ok(r) => r->Rpc.Response.upon(Js.Console.log)
+          | Or_error.Err(e) => Js.Console.log(e)
+          }
+        }, 500)->Some
+    })
+  }
+
   let reducer = (state, action) => {
     let atTime = perfNow(performance)
     let newState = Event.dispatch(state, action, ~atTime)
@@ -56,16 +74,7 @@ module App = {
     } else {
       State.store(newState)
       if Event.shouldTriggerIntelligence(action) {
-        newState
-        ->State.focused
-        ->Option.flatMap(State.construction(newState, _))
-        ->Option.map(State.Construction.typeCheck)
-        ->Option.iter(o =>
-          switch o->Or_error.match {
-          | Or_error.Ok(r) => r->Rpc.Response.upon(Js.Console.log)
-          | Or_error.Err(e) => Js.Console.log(e)
-          }
-        )
+        sendToIntelligence(newState)
       }
       newState
     }
