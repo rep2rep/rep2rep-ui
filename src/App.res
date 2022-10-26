@@ -137,6 +137,7 @@ module App = {
   @react.component
   let make = (~init) => {
     let (state, dispatch) = React.useReducer(reducer, init)
+    let (intel, setIntel) = React.useState(() => Result.Ok())
 
     React.useEffect0(() => {
       state
@@ -150,7 +151,9 @@ module App = {
     })
 
     React.useEffect0(() => {
-      NativeEvent.listen("intelligence", Js.Console.log)
+      NativeEvent.listen("intelligence", res => {
+        setIntel(_ => res)
+      })
       None
     })
 
@@ -604,6 +607,13 @@ module App = {
 
     let inspectorChange = e => dispatchC(e)
 
+    let clickDiagnostic = d =>
+      d
+      ->Diagnostic.affectedTokens
+      ->GraphState.Selection.ofNodes
+      ->Event.Construction.ChangeSelection
+      ->dispatchC
+
     GlobalKeybindings.set([
       K.create(K.cmdOrCtrl() ++ "+z", undo),
       K.create(K.cmdOrCtrl() ++ "+Shift+z", redo),
@@ -794,23 +804,36 @@ module App = {
             ~flexDirection="row",
             (),
           )}>
-          <ReactD3Graph.Graph
-            id={"model-graph"}
-            data={focused
-            ->Option.flatMap(focused =>
-              state
-              ->State.construction(focused)
-              ->Option.map(construction => construction->State.Construction.graph->GraphState.data)
-            )
-            ->Option.getWithDefault(GraphState.empty->GraphState.data)}
-            config
-            selection={selection->GraphState.Selection.toReactD3Selection}
-            onSelectionChange={selectionChange}
-            onNodePositionChange={movedNode}
-            keybindings={keybindings}
-            showGrid
-            style={ReactDOM.Style.make(~flexGrow="1", ())}
-          />
+          <div
+            style={ReactDOM.Style.make(
+              ~flexGrow="1",
+              ~display="flex",
+              ~flexDirection="column",
+              ~position="relative",
+              ~overflow="hidden",
+              (),
+            )}>
+            <ReactD3Graph.Graph
+              id={"model-graph"}
+              data={focused
+              ->Option.flatMap(focused =>
+                state
+                ->State.construction(focused)
+                ->Option.map(construction =>
+                  construction->State.Construction.graph->GraphState.data
+                )
+              )
+              ->Option.getWithDefault(GraphState.empty->GraphState.data)}
+              config
+              selection={selection->GraphState.Selection.toReactD3Selection}
+              onSelectionChange={selectionChange}
+              onNodePositionChange={movedNode}
+              keybindings={keybindings}
+              showGrid
+              style={ReactDOM.Style.make(~flexGrow="1", ())}
+            />
+            <IntelligenceUI intelligence={intel} onClickDiagnostic={clickDiagnostic} />
+          </div>
           <Inspector
             id={"node_inspector"}
             onChange=inspectorChange
