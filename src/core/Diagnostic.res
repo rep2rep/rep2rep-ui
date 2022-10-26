@@ -1,5 +1,6 @@
 module Kind = {
   type t = Error | Information
+
   let t_rpc = {
     let name = "Diagnostic.Kind.t"
     let underlying = Rpc.Datatype.either2_(Rpc.Datatype.unit_, Rpc.Datatype.unit_)
@@ -15,6 +16,14 @@ module Kind = {
       }
     underlying->Rpc.Datatype.convert(name, fromEither, toEither)
   }
+
+  let err_hash = Hash.unique()
+  let info_hash = Hash.unique()
+  let hash = t =>
+    switch t {
+    | Error => err_hash
+    | Information => info_hash
+    }
 }
 
 type t = {
@@ -34,6 +43,12 @@ let t_rpc = {
   let toTuple = t => (t.kind, t.message, t.affectedTokens->Array.map(Gid.toString))
   underlying->Rpc.Datatype.convert(name, fromTuple, toTuple)
 }
+
+let hash = Hash.record3(
+  ("kind", Kind.hash),
+  ("message", String.hash),
+  ("affectedTokens", Array.hash(_, Gid.hash)),
+)
 
 let create = (kind, message, affectedTokens) => {
   kind: kind,
