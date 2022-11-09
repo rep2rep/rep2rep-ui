@@ -133,12 +133,13 @@ module App = {
       None
     })
 
-    React.useEffect0(() => {
-      NativeEvent.listen("intelligence", res => {
+    React.useEffect1(() => {
+      let handler = res => {
         setIntel(_ => res)
-      })
-      None
-    })
+      }
+      let listener = NativeEvent.listen("intelligence", handler)
+      Some(() => NativeEvent.remove(listener))
+    }, [setIntel])
 
     let focused = state->State.focused
 
