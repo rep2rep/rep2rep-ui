@@ -63,7 +63,7 @@ module GraphNode = {
               unselectedStrokeWidth
             }}
           />
-          <g x={"1"} y={"1"}> {TokenData.render(data)} </g>
+          <g transform="translate(1, 1)"> {TokenData.render(data)} </g>
         </>
       },
       (),
