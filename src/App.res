@@ -8,23 +8,6 @@ module FP = {
   include FilePanel
   let make = React.memo(make)
 }
-module NativeEvent: {
-  type t<'a>
-  let create: (string, 'a) => t<'a>
-  let listen: (string, 'a => unit) => unit
-  let dispatch: t<'a> => unit
-} = {
-  type window
-  @val external window: window = "window"
-  type t<'a>
-  @new external _create: (string, {"detail": 'a}) => t<'a> = "CustomEvent"
-  @send external _addEventListener: (window, string, t<'a> => unit) => unit = "addEventListener"
-  @send external _dispatchEvent: (window, t<'a>) => unit = "dispatchEvent"
-  @get external detail: t<'a> => 'a = "detail"
-  let create = (name, payload) => _create(name, {"detail": payload})
-  let listen = (name, callback) => window->_addEventListener(name, t => t->detail->callback)
-  let dispatch = t => window->_dispatchEvent(t)
-}
 
 module App = {
   let db_store = "RST"
