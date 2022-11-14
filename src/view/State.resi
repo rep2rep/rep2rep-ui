@@ -32,9 +32,14 @@ module Construction: {
   let deleteNode: (t, Gid.t) => t
   let deleteLink: (t, Gid.t) => t
   let setSelection: (t, GraphState.Selection.t) => t
-  let toOruga: t => Or_error.t<array<Constructions.construction>>
   let getNode: (t, Gid.t) => option<[#token(TokenData.t) | #constructor(ConstructorData.t)]>
   let getLink: (t, Gid.t) => option<EdgeData.t>
+
+  let toOruga: t => Or_error.t<array<Constructions.construction>>
+  let fromOruga: (array<Constructions.construction>, ~space: string) => Or_error.t<t>
+
+  let typeCheck: t => Or_error.t<Rpc.Response.t<Result.t<unit, array<Diagnostic.t>>>>
+  let transfer: (t, ~targetSpace: string) => Or_error.t<Rpc.Response.t<Or_error.t<t>>>
 
   module Stable: {
     module V1: {
@@ -53,6 +58,7 @@ let empty: t
 let focused: t => option<Gid.t>
 let constructions: t => FileTree.t<(Gid.t, Construction.t)>
 let construction: (t, Gid.t) => option<Construction.t>
+let pathForConstruction: (t, Gid.t) => option<FileTree.Path.t>
 let spaces: t => String.Map.t<CSpace.conSpec>
 let getSpace: (t, string) => option<CSpace.conSpec>
 let typeSystems: t => String.Map.t<FiniteSet.t<Type.PrincipalType.t>>
@@ -66,15 +72,16 @@ let loadRenderers: t => Rpc.Response.t<t>
 let setDB: (IndexedDB.t, string) => unit
 
 let store: t => unit
-let load: unit => Promise.t<option<t>>
+let load: (~atTime: float) => Promise.t<option<t>>
+let isValid: t => Result.t<unit, array<string>>
 
-let newConstruction: (t, Gid.t, string, FileTree.Path.t) => t
+let newConstruction: (t, Gid.t, string, FileTree.Path.t, ~atTime: float) => t
 let deleteConstruction: (t, Gid.t) => t
 let focusConstruction: (t, option<Gid.t>) => t
-let duplicateConstruction: (t, ~oldId: Gid.t, ~newId: Gid.t) => t
+let duplicateConstruction: (t, ~oldId: Gid.t, ~newId: Gid.t, ~atTime: float) => t
 let reorderConstructions: (t, FileTree.t<Gid.t>) => t
-let importConstruction: (t, Gid.t, Construction.t, FileTree.Path.t) => t
-let updateConstruction: (t, Gid.t, Construction.t => Construction.t) => t
+let importConstruction: (t, Gid.t, Construction.t, FileTree.Path.t, ~atTime: float) => t
+let updateConstruction: (t, Gid.t, Construction.t => Construction.t, ~atTime: float) => t
 let updateConstructionBypassingUndoRedo: (t, Gid.t, Construction.t => Construction.t) => t
 
 let newFolder: (t, Gid.t, string, FileTree.Path.t) => t

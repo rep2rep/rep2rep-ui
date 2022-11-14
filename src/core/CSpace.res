@@ -79,6 +79,9 @@ let conSpec_fromJson = json =>
     })
   })
 
+let tokenName = ((name, _)) => name
+let tokenType = ((_, typ)) => typ
+
 let constructorName = ((name, _)) => name
 let constructorSignature = ((_, sig)) => sig
 

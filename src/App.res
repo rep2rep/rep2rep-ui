@@ -1,3 +1,7 @@
+type performance
+@val external performance: performance = "performance"
+@send external perfNow: performance => float = "now"
+
 module BoolStore = LocalStorage.MakeJsonable(Bool)
 module K = GlobalKeybindings.KeyBinding
 module FP = {
@@ -7,23 +11,84 @@ module FP = {
 
 module App = {
   let db_store = "RST"
-  let db_ready = IndexedDB.open_(~name="rst", ~version=1, ~onUpgradeNeeded=db =>
-    db->IndexedDB.createObjectStore(db_store)
-  )->Promise.thenResolve(db => {
-    db->IndexedDB.onError(e => {
-      Js.Console.log(e)
-      Dialog.alert("Database Error!")
-    })
-    State.setDB(db, db_store)
-  })
   let init =
-    db_ready
-    ->Promise.then(_ => State.load())
-    ->Promise.thenResolve(s => s->Option.getWithDefault(State.empty))
+    IndexedDB.open_(~name="rst", ~version=1, ~onUpgradeNeeded=db =>
+      db->IndexedDB.createObjectStore(db_store)
+    )
+    ->Promise.thenResolve(db => {
+      db->IndexedDB.onError(e => {
+        Js.Console.log(e)
+        Dialog.alert("Database Error!")
+      })
+      State.setDB(db, db_store)
+    })
+    ->Promise.then(_ => State.load(~atTime=perfNow(performance)))
+    ->Promise.thenResolve(s =>
+      s
+      ->Option.map(s => {
+        let isValid = if "##VERSION##"->String.endsWith("-DEV") {
+          State.isValid(s)
+        } else {
+          Result.Ok()
+        }
+        if isValid->Result.isError {
+          Dialog.alert("State is starting invalid, oh no!")
+          Js.Console.log2(s, isValid)
+          s
+        } else {
+          s
+        }
+      })
+      ->Option.getWithDefault(State.empty)
+    )
+
+  let intelTimeout = ref(None)
+  let sendToIntelligence = state => {
+    intelTimeout.contents->Option.iter(Js.Global.clearTimeout)
+    state
+    ->State.focused
+    ->Option.flatMap(State.construction(state, _))
+    ->Option.iter(cons => {
+      intelTimeout := Js.Global.setTimeout(() => {
+          let result = State.Construction.typeCheck(cons)
+          switch result->Or_error.match {
+          | Or_error.Ok(r) =>
+            r->Rpc.Response.upon(res =>
+              NativeEvent.create("intelligence", res)->NativeEvent.dispatch
+            )
+          | Or_error.Err(e) =>
+            e
+            ->Error.toString
+            // TODO: Get the ID's from the error? Or produce diagnostics by default?
+            ->Diagnostic.create(Diagnostic.Kind.Error, _, [])
+            ->Array.singleton
+            ->Result.Error
+            ->NativeEvent.create("intelligence", _)
+            ->NativeEvent.dispatch
+          }
+        }, 500)->Some
+    })
+  }
+
   let reducer = (state, action) => {
-    let newState = Event.dispatch(state, action)
-    State.store(newState)
-    newState
+    let atTime = perfNow(performance)
+    let newState = Event.dispatch(state, action, ~atTime)
+    let isValid = if "##VERSION##"->String.endsWith("-DEV") {
+      State.isValid(newState)
+    } else {
+      Result.Ok()
+    }
+    if isValid->Result.isError {
+      Dialog.alert("State became invalid, abandoning event!")
+      Js.Console.log2(newState, isValid)
+      state
+    } else {
+      State.store(newState)
+      if Event.shouldTriggerIntelligence(action) {
+        sendToIntelligence(newState)
+      }
+      newState
+    }
   }
 
   let config = ReactD3Graph.Config.create(
@@ -55,6 +120,7 @@ module App = {
   @react.component
   let make = (~init) => {
     let (state, dispatch) = React.useReducer(reducer, init)
+    let (intel, setIntel) = React.useState(() => Result.Ok())
 
     React.useEffect0(() => {
       state
@@ -66,6 +132,14 @@ module App = {
       })
       None
     })
+
+    React.useEffect1(() => {
+      let handler = res => {
+        setIntel(_ => res)
+      }
+      let listener = NativeEvent.listen("intelligence", handler)
+      Some(() => NativeEvent.remove(listener))
+    }, [setIntel])
 
     let focused = state->State.focused
 
@@ -166,6 +240,26 @@ module App = {
       | Or_error.Ok(construction) =>
         construction->Rpc.Response.upon(c => dispatchC(Event.Construction.Replace(c)))
       }
+
+    let transferConstruction = (id, targetSpace) =>
+      id->Option.iter(id =>
+        state
+        ->State.construction(id)
+        ->Option.iter(construction =>
+          construction
+          ->State.Construction.transfer(~targetSpace)
+          ->Or_error.iter(
+            Rpc.Response.upon(_, newConstruction =>
+              newConstruction->Or_error.iter(newConstruction => {
+                let consId = Gid.create()
+                let path =
+                  state->State.pathForConstruction(id)->Option.getWithDefault(FileTree.Path.root)
+                dispatch(Event.ImportConstruction(consId, newConstruction, path))
+              })
+            ),
+          )
+        )
+      )
 
     let createFolder = path => dispatch(Event.NewFolder(Gid.create(), "Folder", path))
     let renameFolder = (id, newName) => dispatch(Event.RenameFolder(id, newName))
@@ -497,6 +591,13 @@ module App = {
 
     let inspectorChange = e => dispatchC(e)
 
+    let clickDiagnostic = d =>
+      d
+      ->Diagnostic.affectedTokens
+      ->GraphState.Selection.ofNodes
+      ->Event.Construction.ChangeSelection
+      ->dispatchC
+
     GlobalKeybindings.set([
       K.create(K.cmdOrCtrl() ++ "+z", undo),
       K.create(K.cmdOrCtrl() ++ "+Shift+z", redo),
@@ -662,6 +763,18 @@ module App = {
             ->Option.map(state->State.renderable(_))
             ->Option.getWithDefault(false)}
           />
+          <Button
+            onClick={_ => {
+              let target = Dialog.prompt(
+                ~description="Name of target construction space: ",
+                ~default="",
+              )
+              let id = focused
+              target->Option.iter(transferConstruction(id, _))
+            }}
+            value="DO NOT CLICK"
+            enabled={toolbarActive}
+          />
           // <Button.Separator />
           // <a href="manual.html" target="_blank"> {React.string("Manual")} </a>
         </div>
@@ -675,23 +788,36 @@ module App = {
             ~flexDirection="row",
             (),
           )}>
-          <ReactD3Graph.Graph
-            id={"model-graph"}
-            data={focused
-            ->Option.flatMap(focused =>
-              state
-              ->State.construction(focused)
-              ->Option.map(construction => construction->State.Construction.graph->GraphState.data)
-            )
-            ->Option.getWithDefault(GraphState.empty->GraphState.data)}
-            config
-            selection={selection->GraphState.Selection.toReactD3Selection}
-            onSelectionChange={selectionChange}
-            onNodePositionChange={movedNode}
-            keybindings={keybindings}
-            showGrid
-            style={ReactDOM.Style.make(~flexGrow="1", ())}
-          />
+          <div
+            style={ReactDOM.Style.make(
+              ~flexGrow="1",
+              ~display="flex",
+              ~flexDirection="column",
+              ~position="relative",
+              ~overflow="hidden",
+              (),
+            )}>
+            <ReactD3Graph.Graph
+              id={"model-graph"}
+              data={focused
+              ->Option.flatMap(focused =>
+                state
+                ->State.construction(focused)
+                ->Option.map(construction =>
+                  construction->State.Construction.graph->GraphState.data
+                )
+              )
+              ->Option.getWithDefault(GraphState.empty->GraphState.data)}
+              config
+              selection={selection->GraphState.Selection.toReactD3Selection}
+              onSelectionChange={selectionChange}
+              onNodePositionChange={movedNode}
+              keybindings={keybindings}
+              showGrid
+              style={ReactDOM.Style.make(~flexGrow="1", ())}
+            />
+            <IntelligenceUI intelligence={intel} onClickDiagnostic={clickDiagnostic} />
+          </div>
           <Inspector
             id={"node_inspector"}
             onChange=inspectorChange
@@ -759,7 +885,6 @@ module App = {
               )
             )
             ->Option.getWithDefault(Inspector.Data.Nothing)}
-            nodeIds={selection->GraphState.Selection.nodes}
           />
         </div>
       </div>

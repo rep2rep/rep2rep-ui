@@ -5,6 +5,7 @@ type t = {
 
 let create: (~notes: string=?, unit) => t
 let duplicate: t => t
+let isValid: t => Result.t<unit, array<string>>
 let hash: t => Hash.t
 
 module Stable: {

@@ -59,6 +59,8 @@ module Construction = {
     let create = name => {name: name, notes: ""}
 
     let duplicate = t => {name: t.name, notes: t.notes}
+
+    let isValid = _ => Result.Ok()
   }
 
   type t = {
@@ -210,6 +212,119 @@ module Construction = {
     ),
     ("graph", GraphState.hash),
   )
+
+  let isValid = t => {
+    let metaValid = Metadata.isValid(t.metadata)
+    let spaceValid = Result.Ok()
+    let nodeValidator = (data, kind, validator) =>
+      data
+      ->Gid.Map.toArray
+      ->Array.map(((id, data)) => {
+        let valid = validator(data)
+        let graphHasNode =
+          t.graph
+          ->GraphState.getNode(id)
+          ->Option.map(node => GraphState.GraphNode.kind(node) == kind)
+          ->Option.getWithDefault(false)
+        if graphHasNode {
+          valid
+        } else {
+          [
+            Result.Error([(kind :> string) ++ " does not exist in graph: " ++ Gid.toString(id)]),
+            valid,
+          ]->Result.allUnit(Array.concatMany)
+        }
+      })
+      ->Result.allUnit(Array.concatMany)
+    let toksValid = nodeValidator(t.tokenData, #token, TokenData.isValid)
+    let consValid = nodeValidator(t.constructorData, #constructor, ConstructorData.isValid)
+    let edgeValid =
+      t.edgeData
+      ->Gid.Map.toArray
+      ->Array.map(((id, data)) => {
+        let validData = EdgeData.isValid(data)
+        let validSource = if (
+          t.tokenData->Gid.Map.has(EdgeData.source(data)) ||
+            t.constructorData->Gid.Map.has(EdgeData.source(data))
+        ) {
+          Result.Ok()
+        } else {
+          Result.Error([
+            "Edge (" ++
+            Gid.toString(id) ++
+            ") connects to unknown source: " ++
+            Gid.toString(EdgeData.source(data)),
+          ])
+        }
+        let validTarget = if (
+          t.tokenData->Gid.Map.has(EdgeData.target(data)) ||
+            t.constructorData->Gid.Map.has(EdgeData.target(data))
+        ) {
+          Result.Ok()
+        } else {
+          Result.Error([
+            "Edge (" ++
+            Gid.toString(id) ++
+            ") connects to unknown target: " ++
+            Gid.toString(EdgeData.target(data)),
+          ])
+        }
+        let graphHasLink = t.graph->GraphState.getLink(id)->Option.isSome
+        if graphHasLink {
+          [validData, validSource, validTarget]->Result.allUnit(Array.concatMany)
+        } else {
+          [
+            Result.Error(["Edge does not exist in graph: " ++ Gid.toString(id)]),
+            validData,
+            validSource,
+            validTarget,
+          ]->Result.allUnit(Array.concatMany)
+        }
+      })
+      ->Result.allUnit(Array.concatMany)
+    let graphValid = {
+      let nodesHaveData =
+        t.graph
+        ->GraphState.nodes
+        ->Array.map(node =>
+          if node->GraphState.GraphNode.kind == #token {
+            if t.tokenData->Gid.Map.has(node->GraphState.GraphNode.id) {
+              Result.Ok()
+            } else {
+              Result.Error([
+                "Graph token has no associated data: ",
+                Gid.toString(GraphState.GraphNode.id(node)),
+              ])
+            }
+          } else if t.constructorData->Gid.Map.has(node->GraphState.GraphNode.id) {
+            Result.Ok()
+          } else {
+            Result.Error([
+              "Graph constructor has no associated data: ",
+              Gid.toString(GraphState.GraphNode.id(node)),
+            ])
+          }
+        )
+        ->Result.allUnit(Array.concatMany)
+      let linksHaveData =
+        t.graph
+        ->GraphState.links
+        ->Array.map(link =>
+          if t.edgeData->Gid.Map.has(link->GraphState.GraphLink.id) {
+            Result.Ok()
+          } else {
+            Result.Error([
+              "Graph link has no associated data: " ++ Gid.toString(GraphState.GraphLink.id(link)),
+            ])
+          }
+        )
+        ->Result.allUnit(Array.concatMany)
+      [GraphState.isValid(t.graph), nodesHaveData, linksHaveData]->Result.allUnit(Array.concatMany)
+    }
+    [metaValid, spaceValid, toksValid, consValid, edgeValid, graphValid]->Result.allUnit(
+      Array.concatMany,
+    )
+  }
 
   let graph = t => t.graph
   let metadata = t => t.metadata
@@ -530,6 +645,129 @@ module Construction = {
       ->Or_error.map(Array.map(_, fst))
     }
   }
+
+  let fromOruga = (cons, ~space) => {
+    let ids = ref(String.Map.empty)
+    let tokenData = ref(Gid.Map.empty())
+    let constructorData = ref(Gid.Map.empty())
+    let edgeData = ref(Gid.Map.empty())
+    cons->Array.forEach(con => {
+      let readOrugaType = ty => {
+        switch Type.split(ty) {
+        | [] => (None, None)
+        | [a] => (Some(a), None)
+        | arr => (Some(arr[1]->Option.getExn), Some(arr[0]->Option.getExn->Type.name))
+        }
+      }
+      let handleToken = (tok, missingLink) => {
+        let tname = CSpace.tokenName(tok)
+        let ttyp = CSpace.tokenType(tok)
+        let tid = switch ids.contents->String.Map.get(tname) {
+        | Some(id) => id
+        | None => {
+            let id = Gid.create()
+            ids := ids.contents->String.Map.set(tname, id)
+            id
+          }
+        }
+        switch tokenData.contents->Gid.Map.get(tid) {
+        | Some(_) => () // Already added, we're fine!
+        | None => {
+            let (type_, subtype) = readOrugaType(ttyp)
+            let td = TokenData.create(~type_?, ~subtype?, tname)
+            tokenData := tokenData.contents->Gid.Map.set(tid, td)
+          }
+        }
+        missingLink->Option.iter(((idx, connectTo)) => {
+          let eid = Gid.create()
+          let ed = EdgeData.create(tid, connectTo, Some(idx))
+          edgeData := edgeData.contents->Gid.Map.set(eid, ed)
+        })
+        tid
+      }
+      let rec traverseCons = (c, missingLink) =>
+        switch c {
+        | Constructions.TCPair({token: tok, constructor: cons}, inputs) => {
+            let tid = handleToken(tok, missingLink)
+            let cd = {ConstructorData.constructor: Some(cons), notes: ""}
+            let cid = Gid.create()
+            constructorData := constructorData.contents->Gid.Map.set(cid, cd)
+            let eid = Gid.create()
+            let ed = EdgeData.create(cid, tid, None)
+            edgeData := edgeData.contents->Gid.Map.set(eid, ed)
+            inputs->Array.forEachWithIndex((idx, con) => traverseCons(con, Some(idx + 1, cid)))
+          }
+        | Constructions.Source(tok) => handleToken(tok, missingLink)->ignore
+        | Constructions.Reference(tok) => handleToken(tok, missingLink)->ignore
+        }
+      traverseCons(con, None)
+    })
+    let edgeData = edgeData.contents
+    let tokenData = tokenData.contents
+    let constructorData = constructorData.contents
+    Or_error.create({
+      metadata: {
+        name: "Transformed construction",
+        notes: "This construction is a result of applying structure transfer.",
+      },
+      space: Some(space),
+      tokenData: tokenData,
+      constructorData: constructorData,
+      edgeData: edgeData,
+      graph: GraphState.layout(~tokens=tokenData, ~constructors=constructorData, ~edges=edgeData),
+    })
+  }
+
+  let _transfer = Rpc_service.require(
+    "server.transfer",
+    Rpc.Datatype.tuple3_(Constructions.construction_rpc, String.t_rpc, String.t_rpc),
+    Array.t_rpc(Constructions.construction_rpc),
+  )
+
+  let transfer = (t, ~targetSpace) => {
+    let cons = t->toOruga
+    let space = t.space->Or_error.fromOption_s("Structure graph is not part of a space")
+    (cons, space)
+    ->Or_error.both
+    ->Or_error.flatMap(((cons, space)) =>
+      switch cons {
+      | [cons] =>
+        (cons, space, targetSpace)
+        ->_transfer
+        ->Rpc.Response.map(fromOruga(_, ~space=targetSpace))
+        ->Rpc.Response.map(cons =>
+          cons->Or_error.map(cons => {
+            ...cons,
+            metadata: {
+              ...cons.metadata,
+              name: "TRANSFERRED " ++ t.metadata.name ++ " INTO " ++ targetSpace,
+            },
+          })
+        )
+        ->Or_error.create
+      | _ => Or_error.error_s("Structure graph is not a construction.")
+      }
+    )
+  }
+
+  let _typeCheck = Rpc_service.require(
+    "core.construction.typeCheck",
+    Rpc.Datatype.tuple2_(String.t_rpc, Constructions.construction_rpc),
+    Result.t_rpc(Rpc.Datatype.unit_, Array.t_rpc(Diagnostic.t_rpc)),
+  )
+
+  let typeCheck = t => {
+    let construction = toOruga(t)
+    let space = t.space->Or_error.fromOption_s("Structure graph is not part of a space")
+    (space, construction)
+    ->Or_error.both
+    ->Or_error.map(((space, cons)) =>
+      cons
+      ->Array.map(cons => _typeCheck((space, cons)))
+      ->Rpc.Response.all
+      ->Rpc.Response.map(Result.allUnit(_, Array.concatMany))
+    )
+  }
 }
 
 type t = {
@@ -578,6 +816,8 @@ let constructions = t =>
     t.constructions->Gid.Map.get(id)->Option.map(c => (id, UndoRedo.state(c)))->Option.getExn
   )
 let construction = (t, id) => t.constructions->Gid.Map.get(id)->Option.map(UndoRedo.state)
+let pathForConstruction = (t, id) =>
+  t.order->FileTree.getFilePathAndPosition(id' => id == id')->Option.map(fst)
 let spaces = t => t.spaces
 let typeSystems = t => t.typeSystems
 let getSpace = (t, name) => t.spaces->String.Map.get(name)
@@ -622,7 +862,7 @@ let loadRenderers = t =>
 
 let setDB = (newDB, store) => db->SetOnce.set((newDB, store))
 
-let load = () => {
+let load = (~atTime) => {
   let focused = LocalStorage.Raw.getItem("RST:Focused")->Option.flatMap(s => {
     let json = try Or_error.create(Js.Json.parseExn(s)) catch {
     | _ => Or_error.error_s("Badly stored Focused")
@@ -648,7 +888,7 @@ let load = () => {
         arr
         ->Array.keepMap(((id, model)) =>
           switch model->Or_error.match {
-          | Or_error.Ok(m) => (id, UndoRedo.create(m))->Some
+          | Or_error.Ok(m) => (id, UndoRedo.create(m, ~atTime))->Some
           | Or_error.Err(e) => {
               Dialog.alert(
                 "Error loading construction: " ++ Error.messages(e)->Js.Array2.joinWith(";"),
@@ -686,8 +926,43 @@ let store = t => {
   )
 }
 
-let newConstruction = (t, id, name, path) => {
-  let c = Construction.create(name)->UndoRedo.create
+let isValid = t => {
+  let orderValid =
+    t.order
+    ->FileTree.flatten
+    ->Array.keepMap(id =>
+      if t.constructions->Gid.Map.has(id) {
+        None
+      } else {
+        Some(id)
+      }
+    )
+    ->(
+      arr =>
+        switch arr {
+        | [] => Result.Ok()
+        | ids =>
+          ids
+          ->Array.map(id => "FileTree references unknown structure graph: " ++ Gid.toString(id))
+          ->Result.Error
+        }
+    )
+  let constructionsValid =
+    t.constructions
+    ->Gid.Map.toArray
+    ->Array.map(((id, cons)) =>
+      if t.order->FileTree.flatten->Array.includes(id) {
+        cons->UndoRedo.state->Construction.isValid
+      } else {
+        Result.Error(["Construction found that is not in FileTree: " ++ Gid.toString(id)])
+      }
+    )
+    ->Result.allUnit(Array.concatMany)
+  [orderValid, constructionsValid]->Result.allUnit(Array.concatMany)
+}
+
+let newConstruction = (t, id, name, path, ~atTime) => {
+  let c = Construction.create(name)->UndoRedo.create(~atTime)
   {
     ...t,
     focused: Some(id),
@@ -715,7 +990,7 @@ let deleteConstruction = (t, id) => {
 
 let focusConstruction = (t, id) => {...t, focused: id}
 
-let duplicateConstruction = (t, ~oldId, ~newId) => {
+let duplicateConstruction = (t, ~oldId, ~newId, ~atTime) => {
   let (path, position) = t.order->FileTree.getFilePathAndPosition(id => id === oldId)->Option.getExn
   t
   ->construction(oldId)
@@ -724,15 +999,15 @@ let duplicateConstruction = (t, ~oldId, ~newId) => {
     ...t,
     focused: Some(newId),
     order: t.order->FileTree.insertFile(~path, ~position=position + 1, newId)->Option.getExn,
-    constructions: t.constructions->Gid.Map.set(newId, UndoRedo.create(construction)),
+    constructions: t.constructions->Gid.Map.set(newId, UndoRedo.create(construction, ~atTime)),
   })
   ->Option.getWithDefault(t)
 }
 
 let reorderConstructions = (t, order) => {...t, order: order}
 
-let importConstruction = (t, id, construction, path) => {
-  let c = Construction.duplicate(construction)->UndoRedo.create
+let importConstruction = (t, id, construction, path, ~atTime) => {
+  let c = Construction.duplicate(construction)->UndoRedo.create(~atTime)
   {
     ...t,
     focused: Some(id),
@@ -741,14 +1016,14 @@ let importConstruction = (t, id, construction, path) => {
   }
 }
 
-let updateConstruction = (t, id, f) => {
+let updateConstruction = (t, id, f, ~atTime) => {
   ...t,
   constructions: t.constructions->Gid.Map.update(
     id,
     Option.map(_, ur_construction => {
       let c = UndoRedo.state(ur_construction)
       let c' = f(c)
-      ur_construction->UndoRedo.step(c')
+      ur_construction->UndoRedo.step(c', ~atTime)
     }),
   ),
 }

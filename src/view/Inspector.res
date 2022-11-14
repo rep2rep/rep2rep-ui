@@ -684,7 +684,7 @@ module Data = {
 }
 
 @react.component
-let make = (~id, ~data, ~nodeIds, ~onChange=?) => {
+let make = (~id, ~data, ~onChange=?) => {
   let onChange = onChange->Option.getWithDefault(_ => ())
   <HideablePanel2
     id
@@ -745,7 +745,7 @@ let make = (~id, ~data, ~nodeIds, ~onChange=?) => {
           className="inspector-panel-empty-message">
           {React.string("Select a structure graph")}
         </span>
-      | Data.Construction(data, constructionId) => <Construction data onChange />
+      | Data.Construction(data, _) => <Construction data onChange />
       | Data.Token(data, principalTypes, typeSystem, nodeId) =>
         <Token
           data
