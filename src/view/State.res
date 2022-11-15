@@ -720,11 +720,11 @@ module Construction = {
 
   let _transfer = Rpc_service.require(
     "server.transfer",
-    Rpc.Datatype.tuple3_(Constructions.construction_rpc, String.t_rpc, String.t_rpc),
+    Rpc.Datatype.tuple4_(Constructions.construction_rpc, String.t_rpc, String.t_rpc, String.t_rpc),
     Array.t_rpc(Constructions.construction_rpc),
   )
 
-  let transfer = (t, ~targetSpace) => {
+  let transfer = (t, ~targetSpace, ~interSpace) => {
     let cons = t->toOruga
     let space = t.space->Or_error.fromOption_s("Structure graph is not part of a space")
     (cons, space)
@@ -732,7 +732,7 @@ module Construction = {
     ->Or_error.flatMap(((cons, space)) =>
       switch cons {
       | [cons] =>
-        (cons, space, targetSpace)
+        (cons, space, targetSpace, interSpace)
         ->_transfer
         ->Rpc.Response.map(fromOruga(_, ~space=targetSpace))
         ->Rpc.Response.map(cons =>
@@ -777,9 +777,10 @@ type t = {
   spaces: String.Map.t<CSpace.conSpec>,
   typeSystems: String.Map.t<FiniteSet.t<Type.PrincipalType.t>>,
   renderers: String.Map.t<string>, // Endpoints for renderers by space
+  allowedTransfers: String.Map.t<String.Map.t<array<string>>>, // src : tgt : interspaces
 }
 
-let hash = Hash.record6(
+let hash = Hash.record7(
   ("focused", Option.hash(_, Gid.hash)),
   ("order", FileTree.hash(_, Gid.hash)),
   (
@@ -799,6 +800,20 @@ let hash = Hash.record6(
       ->String.Map.toArray
       ->Array.hash(((k, v)) => Hash.combine([String.hash(k), String.hash(v)])),
   ),
+  (
+    "allowedTransfers",
+    ss =>
+      ss
+      ->String.Map.toArray
+      ->Array.hash(((k, v)) =>
+        Hash.combine([
+          String.hash(k),
+          v
+          ->String.Map.toArray
+          ->Array.hash(((k, v)) => Hash.combine([String.hash(k), v->Array.hash(String.hash)])),
+        ])
+      ),
+  ),
 )
 
 let empty = {
@@ -808,6 +823,7 @@ let empty = {
   spaces: String.Map.empty,
   typeSystems: String.Map.empty,
   renderers: String.Map.empty,
+  allowedTransfers: String.Map.empty,
 }
 
 let focused = t => t.focused
@@ -822,6 +838,8 @@ let spaces = t => t.spaces
 let typeSystems = t => t.typeSystems
 let getSpace = (t, name) => t.spaces->String.Map.get(name)
 let renderable = (t, space) => t.renderers->String.Map.has(space)
+let allowedTransfers = (t, space) =>
+  t.allowedTransfers->String.Map.get(space)->Option.getWithDefault(String.Map.empty)
 
 let getAvailableSpaces: unit => Rpc.Response.t<array<CSpace.conSpec>> = Rpc_service.require(
   "server.spaces",
@@ -858,6 +876,37 @@ let loadRenderers = t =>
   getAvailableRenderers()->Rpc.Response.map(renderers => {
     ...t,
     renderers: renderers->String.Map.fromArray,
+  })
+
+let getAllowedTransfers: unit => Rpc.Response.t<
+  array<(string, string, string)>,
+> = Rpc_service.require(
+  "server.allowedTransfers",
+  Rpc.Datatype.unit_,
+  Array.t_rpc(Rpc.Datatype.tuple3_(String.t_rpc, String.t_rpc, String.t_rpc)),
+)
+let loadAllowedTransfers = t =>
+  getAllowedTransfers()->Rpc.Response.map(allowedTransfers => {
+    ...t,
+    allowedTransfers: allowedTransfers->Array.reduce(String.Map.empty, (
+      transfers,
+      (source, target, inter),
+    ) =>
+      transfers->String.Map.update(source, tgts =>
+        switch tgts {
+        | None => Some(String.Map.fromArray([(target, [inter])]))
+        | Some(tgts) =>
+          tgts
+          ->String.Map.update(target, inters =>
+            switch inters {
+            | None => Some([inter])
+            | Some(inters) => inters->Array.push(inter)->Some
+            }
+          )
+          ->Some
+        }
+      )
+    ),
   })
 
 let setDB = (newDB, store) => db->SetOnce.set((newDB, store))
@@ -911,6 +960,7 @@ let load = (~atTime) => {
       spaces: String.Map.empty,
       typeSystems: String.Map.empty,
       renderers: String.Map.empty,
+      allowedTransfers: String.Map.empty,
     })
   })
 }

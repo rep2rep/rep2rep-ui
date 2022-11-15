@@ -39,7 +39,11 @@ module Construction: {
   let fromOruga: (array<Constructions.construction>, ~space: string) => Or_error.t<t>
 
   let typeCheck: t => Or_error.t<Rpc.Response.t<Result.t<unit, array<Diagnostic.t>>>>
-  let transfer: (t, ~targetSpace: string) => Or_error.t<Rpc.Response.t<Or_error.t<t>>>
+  let transfer: (
+    t,
+    ~targetSpace: string,
+    ~interSpace: string,
+  ) => Or_error.t<Rpc.Response.t<Or_error.t<t>>>
 
   module Stable: {
     module V1: {
@@ -64,10 +68,12 @@ let getSpace: (t, string) => option<CSpace.conSpec>
 let typeSystems: t => String.Map.t<FiniteSet.t<Type.PrincipalType.t>>
 let renderable: (t, string) => bool
 let renderConstruction: (t, Gid.t) => Or_error.t<Rpc.Response.t<Construction.t>>
+let allowedTransfers: (t, string) => String.Map.t<array<string>>
 
 let loadSpaces: t => Rpc.Response.t<t>
 let loadTypeSystems: t => Rpc.Response.t<t>
 let loadRenderers: t => Rpc.Response.t<t>
+let loadAllowedTransfers: t => Rpc.Response.t<t>
 
 let setDB: (IndexedDB.t, string) => unit
 

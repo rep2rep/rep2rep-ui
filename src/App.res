@@ -127,6 +127,7 @@ module App = {
       ->State.loadSpaces
       ->Rpc.Response.flatMap(State.loadTypeSystems)
       ->Rpc.Response.flatMap(State.loadRenderers)
+      ->Rpc.Response.flatMap(State.loadAllowedTransfers)
       ->Rpc.Response.upon(state => {
         dispatch(Event.Update(state))
       })
@@ -241,13 +242,13 @@ module App = {
         construction->Rpc.Response.upon(c => dispatchC(Event.Construction.Replace(c)))
       }
 
-    let transferConstruction = (id, targetSpace) =>
+    let transferConstruction = (id, targetSpace, interSpace) =>
       id->Option.iter(id =>
         state
         ->State.construction(id)
         ->Option.iter(construction =>
           construction
-          ->State.Construction.transfer(~targetSpace)
+          ->State.Construction.transfer(~targetSpace, ~interSpace)
           ->Or_error.iter(
             Rpc.Response.upon(_, newConstruction =>
               newConstruction->Or_error.iter(newConstruction => {
@@ -769,8 +770,11 @@ module App = {
                 ~description="Name of target construction space: ",
                 ~default="",
               )
+              let inter = Dialog.prompt(~description="Name of transfer interspace: ", ~default="")
               let id = focused
-              target->Option.iter(transferConstruction(id, _))
+              (target, inter)
+              ->Option.both
+              ->Option.iter(((target, inter)) => transferConstruction(id, target, inter))
             }}
             value="DO NOT CLICK"
             enabled={toolbarActive}
