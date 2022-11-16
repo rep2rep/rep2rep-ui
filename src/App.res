@@ -121,6 +121,7 @@ module App = {
   let make = (~init) => {
     let (state, dispatch) = React.useReducer(reducer, init)
     let (intel, setIntel) = React.useState(() => Result.Ok())
+    let (modalHandle, showModal, closeModal) = Modal.useModal()
 
     React.useEffect0(() => {
       state
@@ -243,22 +244,20 @@ module App = {
       }
 
     let transferConstruction = (id, targetSpace, interSpace) =>
-      id->Option.iter(id =>
-        state
-        ->State.construction(id)
-        ->Option.iter(construction =>
-          construction
-          ->State.Construction.transfer(~targetSpace, ~interSpace)
-          ->Or_error.iter(
-            Rpc.Response.upon(_, newConstruction =>
-              newConstruction->Or_error.iter(newConstruction => {
-                let consId = Gid.create()
-                let path =
-                  state->State.pathForConstruction(id)->Option.getWithDefault(FileTree.Path.root)
-                dispatch(Event.ImportConstruction(consId, newConstruction, path))
-              })
-            ),
-          )
+      state
+      ->State.construction(id)
+      ->Option.iter(construction =>
+        construction
+        ->State.Construction.transfer(~targetSpace, ~interSpace)
+        ->Or_error.iter(
+          Rpc.Response.upon(_, newConstruction =>
+            newConstruction->Or_error.iter(newConstruction => {
+              let consId = Gid.create()
+              let path =
+                state->State.pathForConstruction(id)->Option.getWithDefault(FileTree.Path.root)
+              dispatch(Event.ImportConstruction(consId, newConstruction, path))
+            })
+          ),
         )
       )
 
@@ -765,19 +764,24 @@ module App = {
             ->Option.getWithDefault(false)}
           />
           <Button
-            onClick={_ => {
-              let target = Dialog.prompt(
-                ~description="Name of target construction space: ",
-                ~default="",
-              )
-              let inter = Dialog.prompt(~description="Name of transfer interspace: ", ~default="")
-              let id = focused
-              (target, inter)
-              ->Option.both
-              ->Option.iter(((target, inter)) => transferConstruction(id, target, inter))
-            }}
-            value="DO NOT CLICK"
-            enabled={toolbarActive}
+            onClick={_ =>
+              focused->Option.iter(id => {
+                let options =
+                  state
+                  ->State.construction(id)
+                  ->Option.flatMap(State.Construction.space)
+                  ->Option.map(State.allowedTransfers(state, _))
+                  ->Option.getWithDefault(String.Map.empty)
+                let onTransfer = response => {
+                  response->Option.iter(((target, inter)) =>
+                    transferConstruction(id, target, inter)
+                  )
+                }
+                let content = <TransferSelector options onTransfer closeModal />
+                showModal(content)
+              })}
+            value="Transfer..."
+            enabled={toolbarActive && Option.isSome(focused)}
           />
           // <Button.Separator />
           // <a href="manual.html" target="_blank"> {React.string("Manual")} </a>
@@ -892,6 +896,7 @@ module App = {
           />
         </div>
       </div>
+      <Modal handle={modalHandle} />
     </main>
   }
 }
