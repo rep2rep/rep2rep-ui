@@ -1103,7 +1103,7 @@ let renderConstruction = (t, id) =>
     ->Or_error.flatMap(endpoint => {
       let f = Rpc_service.require(
         endpoint,
-        Constructions.construction_rpc,
+        Array.t_rpc(Constructions.construction_rpc),
         Array.t_rpc(
           Rpc.Datatype.tuple2_(
             String.t_rpc,
@@ -1114,27 +1114,23 @@ let renderConstruction = (t, id) =>
       c
       ->Construction.toOruga
       ->Or_error.flatMap(cs =>
-        switch cs {
-        | [o] =>
-          o
-          ->f
-          ->Rpc.Response.map(renderedToks => {
-            let c =
-              c
-              ->Construction.tokens
-              ->Array.reduce(c, (c', id) =>
-                c'->Construction.updateToken(id, TokenData.setPayload(_, None))
-              )
-            renderedToks->Array.reduce(c, (c', (tokId, payload)) =>
-              c'->Construction.updateToken(
-                tokId->Gid.fromString,
-                TokenData.setPayload(_, Some(payload)),
-              )
+        cs
+        ->f
+        ->Rpc.Response.map(renderedToks => {
+          let c =
+            c
+            ->Construction.tokens
+            ->Array.reduce(c, (c', id) =>
+              c'->Construction.updateToken(id, TokenData.setPayload(_, None))
             )
-          })
-          ->Or_error.create
-        | _ => Or_error.error_s("Not a construction!")
-        }
+          renderedToks->Array.reduce(c, (c', (tokId, payload)) =>
+            c'->Construction.updateToken(
+              tokId->Gid.fromString,
+              TokenData.setPayload(_, Some(payload)),
+            )
+          )
+        })
+        ->Or_error.create
       )
     })
   })
