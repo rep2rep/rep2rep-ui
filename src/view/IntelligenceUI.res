@@ -215,11 +215,7 @@ module Indicator = {
 }
 
 @react.component
-let make = (
-  ~intelligence: Result.t<unit, array<Diagnostic.t>>,
-  ~onClickDiagnostic=?,
-  ~style as givenStyle=?,
-) => {
+let make = (~intelligence: array<Diagnostic.t>, ~onClickDiagnostic=?, ~style as givenStyle=?) => {
   let (visible, setVisible) = React.useState(_ =>
     StringStore.get("RST_ERROR_PANEL_VISIBLE")
     ->Or_error.getWithDefault("")
@@ -239,10 +235,8 @@ let make = (
     setVisible(_ => newVisible)
   }
 
-  let (errors, information) = switch intelligence {
-  | Result.Ok() => ([], [])
-  | Result.Error(arr) => arr->Array.partition(d => Diagnostic.kind(d) == Diagnostic.Kind.Error)
-  }
+  let (errors, information) =
+    intelligence->Array.partition(d => Diagnostic.kind(d) == Diagnostic.Kind.Error)
 
   let status = #ready
 

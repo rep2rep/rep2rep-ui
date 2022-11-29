@@ -8,6 +8,9 @@ module FP = {
   include FilePanel
   let make = React.memo(make)
 }
+module DiagnosticEvent = NativeEvent.Make({
+  type t = array<Diagnostic.t>
+})
 
 module App = {
   let db_store = "RST"
@@ -54,7 +57,10 @@ module App = {
           switch result->Or_error.match {
           | Or_error.Ok(r) =>
             r->Rpc.Response.upon(res =>
-              NativeEvent.create("intelligence", res)->NativeEvent.dispatch
+              switch res {
+              | Ok(r) => DiagnosticEvent.create("intelligence", [])->DiagnosticEvent.dispatch
+              | Error(es) => DiagnosticEvent.create("intelligence", es)->DiagnosticEvent.dispatch
+              }
             )
           | Or_error.Err(e) =>
             e
@@ -62,9 +68,8 @@ module App = {
             // TODO: Get the ID's from the error? Or produce diagnostics by default?
             ->Diagnostic.create(Diagnostic.Kind.Error, _, [])
             ->Array.singleton
-            ->Result.Error
-            ->NativeEvent.create("intelligence", _)
-            ->NativeEvent.dispatch
+            ->DiagnosticEvent.create("intelligence", _)
+            ->DiagnosticEvent.dispatch
           }
         }, 500)->Some
     })
@@ -120,7 +125,7 @@ module App = {
   @react.component
   let make = (~init) => {
     let (state, dispatch) = React.useReducer(reducer, init)
-    let (intel, setIntel) = React.useState(() => Result.Ok())
+    let (intel, setIntel) = React.useState(() => [])
     let (modalHandle, showModal, closeModal) = Modal.useModal()
 
     React.useEffect0(() => {
@@ -139,8 +144,8 @@ module App = {
       let handler = res => {
         setIntel(_ => res)
       }
-      let listener = NativeEvent.listen("intelligence", handler)
-      Some(() => NativeEvent.remove(listener))
+      let listener = DiagnosticEvent.listen("intelligence", handler)
+      Some(() => DiagnosticEvent.remove(listener))
     }, [setIntel])
 
     let focused = state->State.focused
