@@ -249,15 +249,17 @@ module App = {
       ->Option.iter(construction =>
         construction
         ->State.Construction.transfer(~targetSpace, ~interSpace)
-        ->Or_error.iter(
-          Rpc.Response.upon(_, newConstruction =>
-            newConstruction->Or_error.iter(newConstruction => {
+        ->Rpc.Response.upon(newConstruction =>
+          switch newConstruction {
+          | Result.Ok(newConstruction) => {
               let consId = Gid.create()
               let path =
                 state->State.pathForConstruction(id)->Option.getWithDefault(FileTree.Path.root)
               dispatch(Event.ImportConstruction(consId, newConstruction, path))
-            })
-          ),
+            }
+          | Result.Error(ds) =>
+            NativeEvent.create("intelligence", Result.Error(ds))->NativeEvent.dispatch
+          }
         )
       )
 

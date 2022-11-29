@@ -43,7 +43,7 @@ module Construction: {
     t,
     ~targetSpace: string,
     ~interSpace: string,
-  ) => Or_error.t<Rpc.Response.t<Or_error.t<t>>>
+  ) => Rpc.Response.t<Result.t<t, array<Diagnostic.t>>>
 
   module Stable: {
     module V1: {

@@ -721,33 +721,40 @@ module Construction = {
   let _transfer = Rpc_service.require(
     "server.transfer",
     Rpc.Datatype.tuple4_(Constructions.construction_rpc, String.t_rpc, String.t_rpc, String.t_rpc),
-    Array.t_rpc(Constructions.construction_rpc),
+    Result.t_rpc(Array.t_rpc(Constructions.construction_rpc), Array.t_rpc(Diagnostic.t_rpc)),
   )
 
   let transfer = (t, ~targetSpace, ~interSpace) => {
     let cons = t->toOruga
     let space = t.space->Or_error.fromOption_s("Structure graph is not part of a space")
-    (cons, space)
-    ->Or_error.both
-    ->Or_error.flatMap(((cons, space)) =>
-      switch cons {
-      | [cons] =>
-        (cons, space, targetSpace, interSpace)
-        ->_transfer
-        ->Rpc.Response.map(fromOruga(_, ~space=targetSpace))
-        ->Rpc.Response.map(cons =>
-          cons->Or_error.map(cons => {
-            ...cons,
-            metadata: {
-              ...cons.metadata,
-              name: "TRANSFERRED " ++ t.metadata.name ++ " INTO " ++ targetSpace,
-            },
-          })
+    switch (cons, space)->Or_error.both->Or_error.match {
+    | Or_error.Ok(([cons], space)) =>
+      (cons, space, targetSpace, interSpace)
+      ->_transfer
+      ->Rpc.Response.map(r =>
+        r->Result.flatMap(c =>
+          c
+          ->fromOruga(~space=targetSpace)
+          ->Or_error.toResult
+          ->Result.mapError(e => [Diagnostic.create(Diagnostic.Kind.Error, Error.toString(e), [])])
         )
-        ->Or_error.create
-      | _ => Or_error.error_s("Structure graph is not a construction.")
-      }
-    )
+      )
+      ->Rpc.Response.map(cons =>
+        cons->Result.map(_, cons => {
+          ...cons,
+          metadata: {
+            ...cons.metadata,
+            name: "TRANSFERRED " ++ t.metadata.name ++ " INTO " ++ targetSpace,
+          },
+        })
+      )
+    | _ =>
+      Rpc.Response.create(
+        Result.Error([
+          Diagnostic.create(Diagnostic.Kind.Error, "Structure graph is not a construction.", []),
+        ]),
+      )
+    }
   }
 
   let _typeCheck = Rpc_service.require(
