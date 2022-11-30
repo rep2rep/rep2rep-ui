@@ -58,7 +58,7 @@ module App = {
           | Or_error.Ok(r) =>
             r->Rpc.Response.upon(res =>
               switch res {
-              | Ok(r) => DiagnosticEvent.create("intelligence", [])->DiagnosticEvent.dispatch
+              | Ok(_) => DiagnosticEvent.create("intelligence", [])->DiagnosticEvent.dispatch
               | Error(es) => DiagnosticEvent.create("intelligence", es)->DiagnosticEvent.dispatch
               }
             )
@@ -242,11 +242,14 @@ module App = {
     }
 
     let renderConstruction = id =>
-      switch state->State.renderConstruction(id)->Or_error.match {
-      | Or_error.Err(e) => Js.Console.log(e)
-      | Or_error.Ok(construction) =>
-        construction->Rpc.Response.upon(c => dispatchC(Event.Construction.Replace(c)))
-      }
+      state
+      ->State.renderConstruction(id)
+      ->Rpc.Response.upon(c =>
+        switch c {
+        | Result.Ok(c) => dispatchC(Event.Construction.Replace(c))
+        | Result.Error(ds) => DiagnosticEvent.create("intelligence", ds)->DiagnosticEvent.dispatch
+        }
+      )
 
     let transferConstruction = (id, targetSpace, interSpace) =>
       state

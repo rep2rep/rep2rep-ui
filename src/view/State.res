@@ -1097,50 +1097,64 @@ let updateConstructionBypassingUndoRedo = (t, id, f) => {
   ),
 }
 
-let renderConstruction = (t, id) =>
-  t.constructions
-  ->Gid.Map.get(id)
-  ->Or_error.fromOption_s("Cannot find construction to render")
-  ->Or_error.flatMap(c => {
-    let c = UndoRedo.state(c)
-    c
-    ->Construction.space
-    ->Option.flatMap(t.renderers->String.Map.get)
-    ->Or_error.fromOption_s("Construction Space is not renderable")
-    ->Or_error.flatMap(endpoint => {
-      let f = Rpc_service.require(
-        endpoint,
-        Array.t_rpc(Constructions.construction_rpc),
-        Array.t_rpc(
-          Rpc.Datatype.tuple2_(
-            String.t_rpc,
-            Rpc.Datatype.tuple3_(String.t_rpc, Float.t_rpc, Float.t_rpc),
-          ),
-        ),
-      )
+let renderConstruction = (t, id) => {
+  let c' =
+    t.constructions
+    ->Gid.Map.get(id)
+    ->Or_error.fromOption_s("Cannot find construction to render")
+    ->Or_error.flatMap(c => {
+      let c = UndoRedo.state(c)
       c
-      ->Construction.toOruga
-      ->Or_error.flatMap(cs =>
-        cs
-        ->f
-        ->Rpc.Response.map(renderedToks => {
-          let c =
-            c
-            ->Construction.tokens
-            ->Array.reduce(c, (c', id) =>
-              c'->Construction.updateToken(id, TokenData.setPayload(_, None))
-            )
-          renderedToks->Array.reduce(c, (c', (tokId, payload)) =>
-            c'->Construction.updateToken(
-              tokId->Gid.fromString,
-              TokenData.setPayload(_, Some(payload)),
-            )
+      ->Construction.space
+      ->Option.flatMap(t.renderers->String.Map.get)
+      ->Or_error.fromOption_s("Construction Space is not renderable")
+      ->Or_error.flatMap(endpoint => {
+        let f = Rpc_service.require(
+          endpoint,
+          Array.t_rpc(Constructions.construction_rpc),
+          Result.t_rpc(
+            Array.t_rpc(
+              Rpc.Datatype.tuple2_(
+                String.t_rpc,
+                Rpc.Datatype.tuple3_(String.t_rpc, Float.t_rpc, Float.t_rpc),
+              ),
+            ),
+            Array.t_rpc(Diagnostic.t_rpc),
+          ),
+        )
+        c
+        ->Construction.toOruga
+        ->Or_error.flatMap(cs =>
+          cs
+          ->f
+          ->Rpc.Response.map(
+            Result.map(_, renderedToks => {
+              let c =
+                c
+                ->Construction.tokens
+                ->Array.reduce(c, (c', id) =>
+                  c'->Construction.updateToken(id, TokenData.setPayload(_, None))
+                )
+              renderedToks->Array.reduce(c, (c', (tokId, payload)) =>
+                c'->Construction.updateToken(
+                  tokId->Gid.fromString,
+                  TokenData.setPayload(_, Some(payload)),
+                )
+              )
+            }),
           )
-        })
-        ->Or_error.create
-      )
+          ->Or_error.create
+        )
+      })
     })
-  })
+  switch c'->Or_error.match {
+  | Or_error.Ok(v) => v
+  | Or_error.Err(e) =>
+    Rpc.Response.create(
+      Result.Error([Diagnostic.create(Diagnostic.Kind.Error, Error.toString(e), [])]),
+    )
+  }
+}
 
 let newFolder = (t, id, name, path) => {
   ...t,
