@@ -58,7 +58,7 @@ module App = {
           | Or_error.Ok(r) =>
             r->Rpc.Response.upon(res =>
               switch res {
-              | Ok(r) => DiagnosticEvent.create("intelligence", [])->DiagnosticEvent.dispatch
+              | Ok(_) => DiagnosticEvent.create("intelligence", [])->DiagnosticEvent.dispatch
               | Error(es) => DiagnosticEvent.create("intelligence", es)->DiagnosticEvent.dispatch
               }
             )
