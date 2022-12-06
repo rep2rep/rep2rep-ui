@@ -791,6 +791,95 @@ module App = {
           // <Button.Separator />
           // <a href="manual.html" target="_blank"> {React.string("Manual")} </a>
           <Button.Separator />
+          <input
+            name="import_oruga"
+            id="import_oruga"
+            type_="file"
+            accept="*"
+            multiple={false}
+            style={ReactDOM.Style.make(
+              ~width="0.1px",
+              ~height="0.1px",
+              ~opacity="0",
+              ~overflow="hidden",
+              ~position="absolute",
+              ~zIndex="-1",
+              (),
+            )}
+            onChange={e => {
+              let files = e->ReactEvent.Form.currentTarget->(t => t["files"])
+              switch files {
+              | [f] =>
+                File.text(f)
+                |> Js.Promise.then_(text => {
+                  let consFinder = %re("/^\s*construction\s(.+):(.+) = (.+)$/")
+                  text
+                  ->String.split("\n")
+                  ->Array.map(String.trim)
+                  ->Array.forEach(line =>
+                    switch Js.Re.exec_(consFinder, line) {
+                    | Some(result) => {
+                        let captures = Js.Re.captures(result)
+                        Js.Array2.shift(captures)->ignore // Discard the whole match
+                        switch captures->Array.map(Js.Nullable.toOption) {
+                        | [Some(name), Some(space), Some(oruga)] => {
+                            Js.Console.log3(name, space, oruga)
+                            Constructions.fromOrugaString(
+                              oruga,
+                              ~space,
+                            )->Rpc.Response.upon(construction => {
+                              switch construction {
+                              | Some(construction) => {
+                                  let construction =
+                                    [construction]
+                                    ->State.Construction.fromOruga(~space)
+                                    ->Or_error.map(cons =>
+                                      cons->State.Construction.updateMetadata(m =>
+                                        m
+                                        ->State.Construction.Metadata.setNotes(
+                                          "*** Imported from Oruga " ++
+                                          Js.Date.make()->Js.Date.toString ++ " ***",
+                                        )
+                                        ->State.Construction.Metadata.setName(name)
+                                      )
+                                    )
+                                  construction->Or_error.iter(construction =>
+                                    dispatch(
+                                      Event.ImportConstruction(
+                                        Gid.create(),
+                                        construction,
+                                        FileTree.Path.root,
+                                      ),
+                                    )
+                                  )
+                                }
+                              | None =>
+                                Dialog.alert("Failed to find appropriate construction space")
+                              }
+                            })
+                          }
+                        | _ => Dialog.alert("Failed to read construction from Oruga file!")
+                        }
+                      }
+                    | None => Dialog.alert("Unable to parse Oruga file!")
+                    }
+                  )
+                  Js.Promise.resolve()
+                })
+                |> ignore
+              | _ => ()
+              }
+            }}
+          />
+          <label htmlFor="import_oruga">
+            <Button
+              value="Import from Oruga"
+              onClick={e => {
+                let label = ReactEvent.Mouse.target(e)["parentNode"]
+                label["click"](.)
+              }}
+            />
+          </label>
           <Button
             onClick={_ =>
               focused->Option.iter(id => {
