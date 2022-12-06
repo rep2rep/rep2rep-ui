@@ -790,6 +790,52 @@ module App = {
           />
           // <Button.Separator />
           // <a href="manual.html" target="_blank"> {React.string("Manual")} </a>
+          <Button.Separator />
+          <Button
+            onClick={_ =>
+              focused->Option.iter(id => {
+                let space = state->State.construction(id)->Option.flatMap(State.Construction.space)
+                let construction =
+                  state->State.construction(id)->Option.map(State.Construction.toOruga)
+                (space, construction)
+                ->Option.both
+                ->Option.iter(((space, construction)) => {
+                  switch construction->Or_error.match {
+                  | Or_error.Ok(cons) =>
+                    cons
+                    ->Array.map(Constructions.toOrugaString)
+                    ->Rpc.Response.all
+                    ->Rpc.Response.upon(strings => {
+                      let name =
+                        state
+                        ->State.construction(id)
+                        ->Option.map(cons =>
+                          cons->State.Construction.metadata->State.Construction.Metadata.name
+                        )
+                        ->Option.getWithDefault("My Construction")
+                      let content =
+                        "data:text/plain;charset=utf-8," ++
+                        strings
+                        ->Array.mapWithIndex((i, s) =>
+                          "construction " ++
+                          String.replace(name, " ", "_") ++
+                          Int.toString(i + 1) ++
+                          ":" ++
+                          space ++
+                          " = " ++
+                          s
+                        )
+                        ->Array.joinWith("\n\n")
+                        ->Js.Global.encodeURIComponent
+                      Downloader.download(name ++ ".txt", content)
+                    })
+                  | Or_error.Err(_) => ()
+                  }
+                })
+              })}
+            value="Export as Oruga"
+            enabled={toolbarActive && Option.isSome(focused)}
+          />
         </div>
         <div
           className="container"
