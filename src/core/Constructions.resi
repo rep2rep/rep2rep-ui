@@ -13,3 +13,4 @@ let construction_rpc: Rpc.Datatype.t<construction>
 let walk_rpc: Rpc.Datatype.t<walk>
 
 let toOrugaString: construction => Rpc.Response.t<string>
+let fromOrugaString: ((string, string)) => Rpc.Response.t<construction>

@@ -62,3 +62,9 @@ let walk_rpc = Array.t_rpc(vertex_rpc)->Rpc.Datatype.alias("Constructions.walk")
 let url = s => "core.construction." ++ s
 
 let toOrugaString = Rpc_service.require(url("toString"), construction_rpc, String.t_rpc)
+
+let fromOrugaString = Rpc_service.require(
+  "oruga.document.parseConstruction",
+  Rpc.Datatype.tuple2_(String.t_rpc, String.t_rpc),
+  construction_rpc,
+)
