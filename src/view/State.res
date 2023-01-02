@@ -721,33 +721,40 @@ module Construction = {
   let _transfer = Rpc_service.require(
     "server.transfer",
     Rpc.Datatype.tuple4_(Constructions.construction_rpc, String.t_rpc, String.t_rpc, String.t_rpc),
-    Array.t_rpc(Constructions.construction_rpc),
+    Result.t_rpc(Array.t_rpc(Constructions.construction_rpc), Array.t_rpc(Diagnostic.t_rpc)),
   )
 
   let transfer = (t, ~targetSpace, ~interSpace) => {
     let cons = t->toOruga
     let space = t.space->Or_error.fromOption_s("Structure graph is not part of a space")
-    (cons, space)
-    ->Or_error.both
-    ->Or_error.flatMap(((cons, space)) =>
-      switch cons {
-      | [cons] =>
-        (cons, space, targetSpace, interSpace)
-        ->_transfer
-        ->Rpc.Response.map(fromOruga(_, ~space=targetSpace))
-        ->Rpc.Response.map(cons =>
-          cons->Or_error.map(cons => {
-            ...cons,
-            metadata: {
-              ...cons.metadata,
-              name: "TRANSFERRED " ++ t.metadata.name ++ " INTO " ++ targetSpace,
-            },
-          })
+    switch (cons, space)->Or_error.both->Or_error.match {
+    | Or_error.Ok(([cons], space)) =>
+      (cons, space, targetSpace, interSpace)
+      ->_transfer
+      ->Rpc.Response.map(r =>
+        r->Result.flatMap(c =>
+          c
+          ->fromOruga(~space=targetSpace)
+          ->Or_error.toResult
+          ->Result.mapError(e => [Diagnostic.create(Diagnostic.Kind.Error, Error.toString(e), [])])
         )
-        ->Or_error.create
-      | _ => Or_error.error_s("Structure graph is not a construction.")
-      }
-    )
+      )
+      ->Rpc.Response.map(cons =>
+        cons->Result.map(_, cons => {
+          ...cons,
+          metadata: {
+            ...cons.metadata,
+            name: "TRANSFERRED " ++ t.metadata.name ++ " INTO " ++ targetSpace,
+          },
+        })
+      )
+    | _ =>
+      Rpc.Response.create(
+        Result.Error([
+          Diagnostic.create(Diagnostic.Kind.Error, "Structure graph is not a construction.", []),
+        ]),
+      )
+    }
   }
 
   let _typeCheck = Rpc_service.require(
@@ -1090,50 +1097,64 @@ let updateConstructionBypassingUndoRedo = (t, id, f) => {
   ),
 }
 
-let renderConstruction = (t, id) =>
-  t.constructions
-  ->Gid.Map.get(id)
-  ->Or_error.fromOption_s("Cannot find construction to render")
-  ->Or_error.flatMap(c => {
-    let c = UndoRedo.state(c)
-    c
-    ->Construction.space
-    ->Option.flatMap(t.renderers->String.Map.get)
-    ->Or_error.fromOption_s("Construction Space is not renderable")
-    ->Or_error.flatMap(endpoint => {
-      let f = Rpc_service.require(
-        endpoint,
-        Array.t_rpc(Constructions.construction_rpc),
-        Array.t_rpc(
-          Rpc.Datatype.tuple2_(
-            String.t_rpc,
-            Rpc.Datatype.tuple3_(String.t_rpc, Float.t_rpc, Float.t_rpc),
-          ),
-        ),
-      )
+let renderConstruction = (t, id) => {
+  let c' =
+    t.constructions
+    ->Gid.Map.get(id)
+    ->Or_error.fromOption_s("Cannot find construction to render")
+    ->Or_error.flatMap(c => {
+      let c = UndoRedo.state(c)
       c
-      ->Construction.toOruga
-      ->Or_error.flatMap(cs =>
-        cs
-        ->f
-        ->Rpc.Response.map(renderedToks => {
-          let c =
-            c
-            ->Construction.tokens
-            ->Array.reduce(c, (c', id) =>
-              c'->Construction.updateToken(id, TokenData.setPayload(_, None))
-            )
-          renderedToks->Array.reduce(c, (c', (tokId, payload)) =>
-            c'->Construction.updateToken(
-              tokId->Gid.fromString,
-              TokenData.setPayload(_, Some(payload)),
-            )
+      ->Construction.space
+      ->Option.flatMap(t.renderers->String.Map.get)
+      ->Or_error.fromOption_s("Construction Space is not renderable")
+      ->Or_error.flatMap(endpoint => {
+        let f = Rpc_service.require(
+          endpoint,
+          Array.t_rpc(Constructions.construction_rpc),
+          Result.t_rpc(
+            Array.t_rpc(
+              Rpc.Datatype.tuple2_(
+                String.t_rpc,
+                Rpc.Datatype.tuple3_(String.t_rpc, Float.t_rpc, Float.t_rpc),
+              ),
+            ),
+            Array.t_rpc(Diagnostic.t_rpc),
+          ),
+        )
+        c
+        ->Construction.toOruga
+        ->Or_error.flatMap(cs =>
+          cs
+          ->f
+          ->Rpc.Response.map(
+            Result.map(_, renderedToks => {
+              let c =
+                c
+                ->Construction.tokens
+                ->Array.reduce(c, (c', id) =>
+                  c'->Construction.updateToken(id, TokenData.setPayload(_, None))
+                )
+              renderedToks->Array.reduce(c, (c', (tokId, payload)) =>
+                c'->Construction.updateToken(
+                  tokId->Gid.fromString,
+                  TokenData.setPayload(_, Some(payload)),
+                )
+              )
+            }),
           )
-        })
-        ->Or_error.create
-      )
+          ->Or_error.create
+        )
+      })
     })
-  })
+  switch c'->Or_error.match {
+  | Or_error.Ok(v) => v
+  | Or_error.Err(e) =>
+    Rpc.Response.create(
+      Result.Error([Diagnostic.create(Diagnostic.Kind.Error, Error.toString(e), [])]),
+    )
+  }
+}
 
 let newFolder = (t, id, name, path) => {
   ...t,

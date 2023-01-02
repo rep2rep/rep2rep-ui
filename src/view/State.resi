@@ -43,7 +43,7 @@ module Construction: {
     t,
     ~targetSpace: string,
     ~interSpace: string,
-  ) => Or_error.t<Rpc.Response.t<Or_error.t<t>>>
+  ) => Rpc.Response.t<Result.t<t, array<Diagnostic.t>>>
 
   module Stable: {
     module V1: {
@@ -67,7 +67,7 @@ let spaces: t => String.Map.t<CSpace.conSpec>
 let getSpace: (t, string) => option<CSpace.conSpec>
 let typeSystems: t => String.Map.t<FiniteSet.t<Type.PrincipalType.t>>
 let renderable: (t, string) => bool
-let renderConstruction: (t, Gid.t) => Or_error.t<Rpc.Response.t<Construction.t>>
+let renderConstruction: (t, Gid.t) => Rpc.Response.t<Result.t<Construction.t, array<Diagnostic.t>>>
 let allowedTransfers: (t, string) => String.Map.t<array<string>>
 
 let loadSpaces: t => Rpc.Response.t<t>

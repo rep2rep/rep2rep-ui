@@ -328,11 +328,14 @@ module App = {
       })
 
     let renderConstruction = id =>
-      switch state->State.renderConstruction(id)->Or_error.match {
-      | Or_error.Err(e) => Js.Console.log(e)
-      | Or_error.Ok(construction) =>
-        construction->Rpc.Response.upon(c => dispatchC(Event.Construction.Replace(c)))
-      }
+      state
+      ->State.renderConstruction(id)
+      ->Rpc.Response.upon(c =>
+        switch c {
+        | Result.Ok(c) => dispatchC(Event.Construction.Replace(c))
+        | Result.Error(ds) => DiagnosticEvent.create("intelligence", ds)->DiagnosticEvent.dispatch
+        }
+      )
 
     let transferConstruction = (id, targetSpace, interSpace) =>
       state
@@ -340,15 +343,16 @@ module App = {
       ->Option.iter(construction =>
         construction
         ->State.Construction.transfer(~targetSpace, ~interSpace)
-        ->Or_error.iter(
-          Rpc.Response.upon(_, newConstruction =>
-            newConstruction->Or_error.iter(newConstruction => {
+        ->Rpc.Response.upon(newConstruction =>
+          switch newConstruction {
+          | Result.Ok(newConstruction) => {
               let consId = Gid.create()
               let path =
                 state->State.pathForConstruction(id)->Option.getWithDefault(FileTree.Path.root)
               dispatch(Event.ImportConstruction(consId, newConstruction, path))
-            })
-          ),
+            }
+          | Result.Error(ds) => DiagnosticEvent.create("intelligence", ds)->DiagnosticEvent.dispatch
+          }
         )
       )
 
