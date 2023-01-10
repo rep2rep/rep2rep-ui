@@ -190,36 +190,33 @@ module App = {
         ),
       )
     let reorderConstructions = newOrder => dispatch(Event.ReorderConstructions(newOrder))
-    let importConstructions = (fs, path) =>
-      fs->Array.forEach(f => {
-        File.text(f)
-        |> Js.Promise.then_(text => {
-          let construction = try text
-          ->Js.Json.parseExn
-          ->State.Construction.Stable.V1.fromJson catch {
-          | _ => Or_error.error_s("fail")
-          }
-          switch construction->Or_error.match {
-          | Or_error.Ok(construction) => {
-              let construction =
-                construction->State.Construction.updateMetadata(m =>
-                  m->State.Construction.Metadata.setNotes(
-                    m->State.Construction.Metadata.notes ++
-                    "\n*** Imported " ++
-                    Js.Date.make()->Js.Date.toString ++ " ***",
-                  )
+    let importConstruction = (f, path) => {
+      File.text(f)
+      ->Promise.then(text => {
+        let construction = try text->Js.Json.parseExn->State.Construction.Stable.V1.fromJson catch {
+        | _ => Or_error.error_s("fail")
+        }
+        switch construction->Or_error.match {
+        | Or_error.Ok(construction) => {
+            let construction =
+              construction->State.Construction.updateMetadata(m =>
+                m->State.Construction.Metadata.setNotes(
+                  m->State.Construction.Metadata.notes ++
+                  "\n*** Imported " ++
+                  Js.Date.make()->Js.Date.toString ++ " ***",
                 )
-              dispatch(Event.ImportConstruction(Gid.create(), construction, path))
-            }
-          | Or_error.Err(e) => {
-              Js.Console.log(e)
-              Dialog.alert("Failed to import '" ++ File.name(f) ++ "'.")
-            }
+              )
+            dispatch(Event.ImportConstruction(Gid.create(), construction, path))
           }
-          Js.Promise.resolve()
-        })
-        |> ignore
+        | Or_error.Err(e) => {
+            Js.Console.log(e)
+            Dialog.alert("Failed to import '" ++ File.name(f) ++ "'.")
+          }
+        }
+        Promise.resolve()
       })
+      ->ignore
+    }
 
     let exportConstruction = id => {
       state
@@ -241,91 +238,141 @@ module App = {
       })
     }
 
-    let importOruga = text => {
+    let importOruga = (f, path) => {
       let consFinder = %re("/^\s*construction\s(.+):(.+) = (.+)$/")
-      text
-      ->String.split("\n")
-      ->Array.map(String.trim)
-      ->Array.forEach(line =>
-        switch Js.Re.exec_(consFinder, line) {
-        | Some(result) => {
-            let captures = Js.Re.captures(result)
-            Js.Array2.shift(captures)->ignore // Discard the whole match
-            switch captures->Array.map(Js.Nullable.toOption) {
-            | [Some(name), Some(space), Some(oruga)] =>
-              Constructions.fromOrugaString(oruga, ~space)->Rpc.Response.upon(construction => {
-                switch construction {
-                | Some(construction) => {
-                    let construction =
-                      [construction]
-                      ->State.Construction.fromOruga(~space)
-                      ->Or_error.map(cons =>
-                        cons->State.Construction.updateMetadata(m =>
-                          m
-                          ->State.Construction.Metadata.setNotes(
-                            "*** Imported from Oruga " ++
-                            Js.Date.make()->Js.Date.toString ++ " ***",
+      File.text(f)
+      ->Promise.thenResolve(text =>
+        text
+        ->String.split("\n")
+        ->Array.map(String.trim)
+        ->Array.forEach(line =>
+          switch Js.Re.exec_(consFinder, line) {
+          | Some(result) => {
+              let captures = Js.Re.captures(result)
+              Js.Array2.shift(captures)->ignore // Discard the whole match
+              switch captures->Array.map(Js.Nullable.toOption) {
+              | [Some(name), Some(space), Some(oruga)] =>
+                Constructions.fromOrugaString(oruga, ~space)->Rpc.Response.upon(construction => {
+                  switch construction {
+                  | Some(construction) => {
+                      let construction =
+                        [construction]
+                        ->State.Construction.fromOruga(~space)
+                        ->Or_error.map(cons =>
+                          cons->State.Construction.updateMetadata(m =>
+                            m
+                            ->State.Construction.Metadata.setNotes(
+                              "*** Imported from Oruga " ++
+                              Js.Date.make()->Js.Date.toString ++ " ***",
+                            )
+                            ->State.Construction.Metadata.setName(name)
                           )
-                          ->State.Construction.Metadata.setName(name)
                         )
+                      construction->Or_error.iter(construction =>
+                        dispatch(Event.ImportConstruction(Gid.create(), construction, path))
                       )
-                    construction->Or_error.iter(construction =>
-                      dispatch(
-                        Event.ImportConstruction(Gid.create(), construction, FileTree.Path.root),
-                      )
-                    )
+                    }
+                  | None => Dialog.alert("Failed to parse construction or space.")
                   }
-                | None => Dialog.alert("Failed to parse construction or space.")
-                }
-              })
-            | _ => Dialog.alert("Failed to find construction in Oruga file.")
+                })
+              | _ => Dialog.alert("Failed to find construction in Oruga file.")
+              }
             }
+          | None => Dialog.alert("Unable to parse Oruga file.")
           }
-        | None => Dialog.alert("Unable to parse Oruga file.")
-        }
+        )
       )
+      ->ignore
     }
 
-    let exportOruga = () =>
-      focused->Option.iter(id => {
-        let space = state->State.construction(id)->Option.flatMap(State.Construction.space)
-        let construction = state->State.construction(id)->Option.map(State.Construction.toOruga)
-        (space, construction)
-        ->Option.both
-        ->Option.iter(((space, construction)) => {
-          switch construction->Or_error.match {
-          | Or_error.Ok(cons) =>
-            cons
-            ->Array.map(Constructions.toOrugaString)
-            ->Rpc.Response.all
-            ->Rpc.Response.upon(strings => {
-              let name =
-                state
-                ->State.construction(id)
-                ->Option.map(cons =>
-                  cons->State.Construction.metadata->State.Construction.Metadata.name
-                )
-                ->Option.getWithDefault("My Construction")
-              let content =
-                "data:text/plain;charset=utf-8," ++
-                strings
-                ->Array.mapWithIndex((i, oruga) =>
-                  [
-                    "construction",
-                    name,
-                    Int.toString(i + 1) ++ ":" ++ space,
-                    "=",
-                    oruga,
-                  ]->Array.joinWith(" ")
-                )
-                ->Array.joinWith("\n\n")
-                ->Js.Global.encodeURIComponent
-              Downloader.download(name ++ ".txt", content)
-            })
-          | Or_error.Err(_) => ()
-          }
-        })
+    let exportOruga = id => {
+      let space = state->State.construction(id)->Option.flatMap(State.Construction.space)
+      let construction = state->State.construction(id)->Option.map(State.Construction.toOruga)
+      (space, construction)
+      ->Option.both
+      ->Option.iter(((space, construction)) => {
+        switch construction->Or_error.match {
+        | Or_error.Ok(cons) =>
+          cons
+          ->Array.map(Constructions.toOrugaString)
+          ->Rpc.Response.all
+          ->Rpc.Response.upon(strings => {
+            let name =
+              state
+              ->State.construction(id)
+              ->Option.map(cons =>
+                cons->State.Construction.metadata->State.Construction.Metadata.name
+              )
+              ->Option.getWithDefault("My Construction")
+            let content =
+              "data:text/plain;charset=utf-8," ++
+              strings
+              ->Array.mapWithIndex((i, oruga) =>
+                [
+                  "construction",
+                  name,
+                  Int.toString(i + 1) ++ ":" ++ space,
+                  "=",
+                  oruga,
+                ]->Array.joinWith(" ")
+              )
+              ->Array.joinWith("\n\n")
+              ->Js.Global.encodeURIComponent
+            Downloader.download(name ++ ".oruga", content)
+          })
+        | Or_error.Err(_) => ()
+        }
       })
+    }
+
+    let import_ = (fs, path) =>
+      fs->Array.forEach(f =>
+        if f->File.name->String.endsWith(".rst") {
+          importConstruction(f, path)
+        } else if f->File.name->String.endsWith(".oruga") {
+          importOruga(f, path)
+        }
+      )
+
+    let export_ = id => {
+      let content = {
+        <div style={ReactDOM.Style.make(~textAlign="center", ~padding="0.5rem", ())}>
+          {React.string("Choose export format:")}
+          <div style={ReactDOM.Style.make(~margin="0.4rem", ())} />
+          <Button
+            onClick={_ => {
+              exportConstruction(id)
+              closeModal()
+            }}
+            value="Export as RST"
+          />
+          <Button
+            onClick={_ => {
+              exportOruga(id)
+              closeModal()
+            }}
+            value="Export as Oruga"
+          />
+          <div style={ReactDOM.Style.make(~margin="0.5rem", ())} />
+          <div style={ReactDOM.Style.make(~fontSize="0.8rem", ~textAlign="left", ())}>
+            {React.string(
+              "Exporting as RST preserves faithfully preserves your structure graph as created here. ",
+            )}
+            {React.string(
+              "Exporting as Oruga allows for interoperability with other RST-based tools.",
+            )}
+          </div>
+          <div style={ReactDOM.Style.make(~margin="0.4rem", ())} />
+          <Button
+            onClick={_ => {
+              closeModal()
+            }}
+            value="Cancel"
+          />
+        </div>
+      }
+      showModal(content)
+    }
 
     let renderConstruction = id =>
       state
@@ -751,7 +798,7 @@ module App = {
           construction->State.Construction.metadata->State.Construction.Metadata.name}
         title="RST Editor"
         version="##VERSION##"
-        importExtensions=[".rst"]
+        importExtensions=[".rst", ".oruga"]
         active={State.focused(state)}
         onCreate={newConstruction}
         onDelete={deleteConstruction}
@@ -759,8 +806,8 @@ module App = {
         onDuplicate={duplicateConstruction}
         onChangedName={renameConstruction}
         onReorder={reorderConstructions}
-        onImport={importConstructions}
-        onExport={exportConstruction}
+        onImport={import_}
+        onExport={export_}
         onCreateFolder={createFolder}
         onDeleteFolder={deleteFolder}
         onChangedFolderName={renameFolder}
@@ -880,50 +927,6 @@ module App = {
           />
           // <Button.Separator />
           // <a href="manual.html" target="_blank"> {React.string("Manual")} </a>
-          <Button.Separator />
-          <input
-            name="import_oruga"
-            id="import_oruga"
-            type_="file"
-            accept="*"
-            multiple={false}
-            style={ReactDOM.Style.make(
-              ~width="0.1px",
-              ~height="0.1px",
-              ~opacity="0",
-              ~overflow="hidden",
-              ~position="absolute",
-              ~zIndex="-1",
-              (),
-            )}
-            onChange={e => {
-              let files = e->ReactEvent.Form.currentTarget->(t => t["files"])
-              switch files {
-              | [f] =>
-                File.text(f)
-                |> Js.Promise.then_(text => {
-                  importOruga(text)
-                  Js.Promise.resolve()
-                })
-                |> ignore
-              | _ => ()
-              }
-            }}
-          />
-          <label htmlFor="import_oruga">
-            <Button
-              value="Import from Oruga"
-              onClick={e => {
-                let label = ReactEvent.Mouse.target(e)["parentNode"]
-                label["click"](.)
-              }}
-            />
-          </label>
-          <Button
-            onClick={_ => exportOruga()}
-            value="Export as Oruga"
-            enabled={toolbarActive && Option.isSome(focused)}
-          />
         </div>
         <div
           className="container"
