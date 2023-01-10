@@ -309,8 +309,14 @@ module App = {
               let content =
                 "data:text/plain;charset=utf-8," ++
                 strings
-                ->Array.mapWithIndex((i, s) =>
-                  "construction " ++ name ++ Int.toString(i + 1) ++ ":" ++ space ++ " = " ++ s
+                ->Array.mapWithIndex((i, oruga) =>
+                  [
+                    "construction",
+                    name,
+                    Int.toString(i + 1) ++ ":" ++ space,
+                    "=",
+                    oruga,
+                  ]->Array.joinWith(" ")
                 )
                 ->Array.joinWith("\n\n")
                 ->Js.Global.encodeURIComponent
