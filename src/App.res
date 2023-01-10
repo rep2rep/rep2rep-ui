@@ -310,13 +310,7 @@ module App = {
                 "data:text/plain;charset=utf-8," ++
                 strings
                 ->Array.mapWithIndex((i, s) =>
-                  "construction " ++
-                  String.replace(name, " ", "_") ++
-                  Int.toString(i + 1) ++
-                  ":" ++
-                  space ++
-                  " = " ++
-                  s
+                  "construction " ++ name ++ Int.toString(i + 1) ++ ":" ++ space ++ " = " ++ s
                 )
                 ->Array.joinWith("\n\n")
                 ->Js.Global.encodeURIComponent
