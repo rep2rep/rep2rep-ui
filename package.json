@@ -10,7 +10,8 @@
     "deploy": "NODE_ENV='production' ./scripts/build",
     "clean": "./node_modules/rescript/rescript clean; rm -rf ./dist",
     "format": "./scripts/format-rescript; ./scripts/format-json",
-    "watch": "./scripts/watch"
+    "watch": "./scripts/watch",
+    "start": "python3 -m http.server 8008 --directory dist"
   },
   "author": "rep2rep",
   "devDependencies": {
